@@ -1,0 +1,49 @@
+{
+  "name": "@pipeit/tx-builder",
+  "version": "0.1.0",
+  "description": "High-level builder API for Solana transactions (beginner-friendly)",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rm -rf dist",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest"
+  },
+  "keywords": [
+    "solana",
+    "transaction",
+    "builder",
+    "simplified"
+  ],
+  "license": "MIT",
+  "peerDependencies": {
+    "gill": "^0.12.0"
+  },
+  "dependencies": {
+    "@pipeit/tx-core": "workspace:*",
+    "@pipeit/tx-errors": "workspace:*"
+  },
+  "devDependencies": {
+    "gill": "^0.12.0",
+    "@types/node": "^24",
+    "tsup": "^8.5.0",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  }
+}
+

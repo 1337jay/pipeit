@@ -1,0 +1,16 @@
+{
+  "$schema": "https://unpkg.com/@changesets/config@1.6.4/schema.json",
+  "changelog": ["@changesets/changelog-github", { "repo": "pipeit/solana-transaction-builder" }],
+  "commit": false,
+  "linked": [],
+  "access": "public",
+  "baseBranch": "main",
+  "updateInternalDependencies": "patch",
+  "ignore": []
+}
+
+
+
+
+
+
