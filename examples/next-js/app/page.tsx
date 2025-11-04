@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { TransactionDemo } from '@/components/transactions';
 import { ConnectButton, ClusterSelector, AccountSwitcher } from '@/components/connector';
 import { useConnector } from '@solana/connector';
@@ -12,7 +13,12 @@ export default function Home() {
             {/* Header */}
             <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
                 <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-                    <div className="font-semibold text-lg">ConnectorKit Demo</div>
+                    <div className="flex items-center gap-6">
+                        <div className="font-semibold text-lg">ConnectorKit Demo</div>
+                        <Link href="/pipelines" className="text-sm text-muted-foreground hover:text-foreground">
+                            Pipeline Examples
+                        </Link>
+                    </div>
                     <div className="flex items-center gap-2">
                         {connected && (
                             <>

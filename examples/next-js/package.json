@@ -11,6 +11,8 @@
     "dependencies": {
         "@pipeit/tx-builder": "workspace:*",
         "@pipeit/tx-core": "workspace:*",
+        "@pipeit/tx-orchestration": "workspace:*",
+        "@phosphor-icons/react": "^2.1.10",
         "@solana/connector": "0.1.2",
         "@solana/connector-debugger": "0.1.1",
         "@radix-ui/react-avatar": "^1.1.10",
