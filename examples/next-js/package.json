@@ -19,7 +19,7 @@
         "@radix-ui/react-separator": "^1.1.7",
         "@radix-ui/react-slot": "^1.2.3",
         "@radix-ui/react-tabs": "^1.1.13",
-        "@solana/connector": "0.1.2",
+        "@solana/connector": "0.1.3",
         "@solana/connector-debugger": "0.1.1",
         "@solana/web3.js": "^1.98.4",
         "@tanstack/react-query": "^5.90.5",

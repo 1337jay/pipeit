@@ -48,7 +48,8 @@ export function ConnectButton({ className }: ConnectButtonProps) {
                                 <Wallet className="h-3 w-3" />
                             </AvatarFallback>
                         </Avatar>
-                        <ChevronDown className="ml-2 h-4 w-4 opacity-50" />
+                        <div className="h-8 w-px bg-sand-200" />
+                        <ChevronDown className="h-4 w-4 opacity-50" />
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-72">
