@@ -27,9 +27,9 @@ export function TransactionResult({ signature, cluster = 'devnet' }: Transaction
             </CardHeader>
             <CardContent className="space-y-3">
                 <div className="space-y-2">
-                    <div className="text-sm font-medium">Transaction Signature</div>
+                    <div className="text-body-md font-inter-medium">Transaction Signature</div>
                     <div className="flex items-center gap-2 p-3 bg-white rounded-lg border border-green-200">
-                        <code className="text-xs font-mono flex-1 truncate">{signature}</code>
+                        <code className="text-body-md font-berkeley-mono flex-1 truncate">{signature}</code>
                         <CopyButton textToCopy={signature} showText={false} />
                     </div>
                 </div>
@@ -38,7 +38,7 @@ export function TransactionResult({ signature, cluster = 'devnet' }: Transaction
                     href={explorerUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 text-sm text-green-700 hover:text-green-800 font-medium"
+                    className="inline-flex items-center gap-2 text-body-md text-green-700 hover:text-green-800 font-inter-medium"
                 >
                     View on Solana Explorer
                     <ExternalLink className="h-4 w-4" />

@@ -50,15 +50,15 @@ export function ConnectButton({ className }: ConnectButtonProps) {
                                 <Wallet className="h-3 w-3" />
                             </AvatarFallback>
                         </Avatar>
-                        <span className="font-mono text-sm">{shortAddress}</span>
+                        <span className="font-berkeley-mono text-body-md">{shortAddress}</span>
                         <ChevronDown className="ml-2 h-4 w-4 opacity-50" />
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
                     <DropdownMenuLabel>
                         <div className="flex flex-col space-y-1">
-                            <p className="text-sm font-medium leading-none">{selectedWallet.name}</p>
-                            <p className="text-xs font-mono text-muted-foreground">{shortAddress}</p>
+                            <p className="text-body-md font-inter-medium leading-none">{selectedWallet.name}</p>
+                            <p className="text-body-md font-berkeley-mono text-muted-foreground">{shortAddress}</p>
                         </div>
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />

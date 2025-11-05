@@ -11,9 +11,9 @@ interface CodeComparisonProps {
 
 export function CodeComparison({ title, code }: CodeComparisonProps) {
     return (
-        <Card className="mt-4">
+        <Card className="">
             <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-mono">{title}</CardTitle>
+                <CardTitle className="text-body-md font-berkeley-mono">{title}</CardTitle>
             </CardHeader>
             <CardContent>
                 <SyntaxHighlighter

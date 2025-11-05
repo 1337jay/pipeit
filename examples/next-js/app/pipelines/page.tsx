@@ -36,10 +36,10 @@ export default function PipelinesPage() {
         {Object.entries(sections).map(([section, examples]) => (
           <section key={section} className="mb-12">
             <h2 className="text-title-4 mb-4">{sectionTitles[section]}</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4">
               {examples.map((example) => (
-                <Link key={example.id} href={`/pipelines/${example.id}`}>
-                  <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
+                <Link key={example.id} href={`/pipelines/${example.id}`} className="flex-shrink-0">
+                  <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full w-64">
                     <CardHeader>
                       <CardTitle className="text-title-5">{example.name}</CardTitle>
                       <CardDescription className="text-body-md">{example.description}</CardDescription>

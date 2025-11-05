@@ -92,7 +92,7 @@ export default function PipelineDetailPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
-      <div className="container mx-auto px-4 py-12">
+      <div className="w-full px-4 py-12">
         <div className="mb-8">
           <h1 className="text-h2 mb-2">{example.name}</h1>
           <p className="text-body-xl text-muted-foreground">{example.description}</p>
@@ -108,7 +108,7 @@ export default function PipelineDetailPage() {
               {visualPipeline && (
                 <>
                   {/* Strategy switcher */}
-                  <div className="mb-4 flex gap-2">
+                  <div className="mb-4 flex flex-row gap-2 flex-nowrap">
                     {(['auto', 'batch', 'sequential'] as const).map((s) => (
                       <Button
                         key={s}

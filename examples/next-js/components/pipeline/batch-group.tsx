@@ -74,7 +74,7 @@ export function BatchGroup({ visualPipeline, stepNames, batchIndex }: BatchGroup
     >
       {/* Batch header */}
       <motion.div
-        className="absolute -top-3 left-4 bg-purple-100 px-2 py-0.5 rounded text-xs font-mono text-purple-700 border border-purple-300"
+        className="absolute -top-3 left-4 bg-purple-100 px-2 py-0.5 rounded text-xs font-berkeley-mono text-purple-700 border border-purple-300"
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
@@ -136,12 +136,12 @@ export function BatchGroup({ visualPipeline, stepNames, batchIndex }: BatchGroup
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5, ...springs.default }}
         >
-          <div className="text-xs font-mono text-gray-600">
+          <div className="text-body-md font-berkeley-mono text-gray-600">
             Signature: {signature.slice(0, 8)}...
           </div>
           {savings > 0 && (
             <motion.div
-              className="text-xs text-green-600 font-medium"
+              className="text-body-md text-green-600 font-inter-medium"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.7 }}

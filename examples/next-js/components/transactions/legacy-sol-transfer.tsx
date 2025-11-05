@@ -7,6 +7,7 @@ import { useWalletAdapterCompat } from '@solana/connector/compat';
 import { useTransactionSigner, useConnector, useCluster, useConnectorClient } from '@solana/connector';
 import { TransactionForm } from './transaction-form';
 import { TransactionResult } from './transaction-result';
+import { CodeComparison } from './code-comparison';
 
 /**
  * Legacy SOL Transfer Component
@@ -104,8 +105,43 @@ export function LegacySolTransfer() {
         }
     }
 
+    const legacyCode = `// Create connection using web3.js v1
+const connection = new Connection(rpcUrl, 'confirmed');
+
+// Create public keys
+const recipientPubkey = new PublicKey(recipientAddress);
+const senderPubkey = new PublicKey(walletAdapter.publicKey);
+
+// Get recent blockhash
+const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+
+// Create transfer instruction using SystemProgram
+const transferInstruction = SystemProgram.transfer({
+    fromPubkey: senderPubkey,
+    toPubkey: recipientPubkey,
+    lamports: amount * LAMPORTS_PER_SOL,
+});
+
+// Build transaction
+const transaction = new Transaction({
+    feePayer: senderPubkey,
+    blockhash,
+    lastValidBlockHeight,
+}).add(transferInstruction);
+
+// Sign and send using wallet adapter
+const sig = await walletAdapter.sendTransaction(transaction, connection);
+
+// Wait for confirmation
+await connection.confirmTransaction({
+    signature: sig,
+    blockhash,
+    lastValidBlockHeight,
+});`;
+
     return (
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 lg:grid-cols-6 gap-4">
+            <div className="col-span-2">
             <TransactionForm
                 title="Legacy SOL Transfer"
                 description="Using @solana/web3.js with wallet adapter compat layer"
@@ -113,7 +149,11 @@ export function LegacySolTransfer() {
                 disabled={!walletAdapter.connected}
                 defaultRecipient="DemoWa11et1111111111111111111111111111111111"
             />
-            {signature && <TransactionResult signature={signature} cluster={cluster?.id || 'devnet'} />}
+            </div>
+            <div className="col-span-4">
+                {signature && <TransactionResult signature={signature} cluster={cluster?.id || 'devnet'} />}
+                <CodeComparison title="Transaction Code (Legacy Approach)" code={legacyCode} />
+            </div>
         </div>
     );
 }

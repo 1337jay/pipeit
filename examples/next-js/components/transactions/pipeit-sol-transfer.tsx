@@ -105,7 +105,8 @@ const signature = await transaction({ priorityLevel: 'medium', autoRetry: true }
     });`;
 
     return (
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 lg:grid-cols-6 gap-4">
+            <div className="col-span-2">
             <TransactionForm
                 title="Pipeit SOL Transfer"
                 description="Simplified with fluent builder API"
@@ -113,8 +114,11 @@ const signature = await transaction({ priorityLevel: 'medium', autoRetry: true }
                 disabled={!ready}
                 defaultRecipient="DemoWa11et1111111111111111111111111111111111"
             />
+            </div>
+            <div className="col-span-4">
             {signature && <TransactionResult signature={signature} cluster={cluster?.id || 'devnet'} />}
             <CodeComparison title="Transaction Code (Pipeit Approach)" code={pipeitCode} />
+            </div>
         </div>
     );
 }

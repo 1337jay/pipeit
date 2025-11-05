@@ -73,7 +73,7 @@ function TransactionStepNodeComponent({
       >
         <motion.div
           className={cn(
-            'relative flex items-center justify-center font-mono text-xs font-medium border-2 overflow-hidden rounded-full',
+            'relative flex items-center justify-center font-berkeley-mono text-body-md font-inter-medium border-2 overflow-hidden rounded-full',
             !isInstruction && 'rotate-45',
             isBatched && 'ring-2 ring-purple-300 ring-offset-2'
           )}
@@ -156,7 +156,7 @@ function TransactionStepNodeComponent({
             ) : isFailed ? (
               <span className="text-lg">✗</span>
             ) : (
-              <span className="text-xs">{stepName.slice(0, 3)}</span>
+              <span className="text-body-md">{stepName.slice(0, 3)}</span>
             )}
           </motion.div>
         </motion.div>
@@ -164,7 +164,7 @@ function TransactionStepNodeComponent({
 
       {/* Step name label */}
       <motion.div
-        className="mt-2 text-xs font-mono text-gray-500 text-center max-w-[80px] truncate"
+        className="mt-2 text-body-md font-berkeley-mono text-gray-500 text-center max-w-[80px] truncate"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.2 }}
@@ -176,7 +176,7 @@ function TransactionStepNodeComponent({
       <AnimatePresence>
         {isHovering && isConfirmed && state.type === 'confirmed' && (
           <motion.div
-            className="absolute -top-12 left-1/2 -translate-x-1/2 bg-black/90 text-white px-2 py-1 rounded text-xs font-mono whitespace-nowrap z-10"
+            className="absolute -top-12 left-1/2 -translate-x-1/2 bg-black/90 text-white px-2 py-1 rounded text-body-md font-berkeley-mono whitespace-nowrap z-10"
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
@@ -191,13 +191,13 @@ function TransactionStepNodeComponent({
       <AnimatePresence>
         {showErrorBubble && isFailed && state.type === 'failed' && (
           <motion.div
-            className="absolute -top-20 left-1/2 -translate-x-1/2 bg-red-500 text-white px-3 py-2 rounded-lg text-xs max-w-[200px] z-10 shadow-lg"
+            className="absolute -top-20 left-1/2 -translate-x-1/2 bg-red-500 text-white px-3 py-2 rounded-lg text-body-md max-w-[200px] z-10 shadow-lg"
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={springs.failureBubble}
           >
-            <div className="font-semibold mb-1">Error</div>
+            <div className="font-inter-semibold mb-1">Error</div>
             <div className="text-red-100">{state.error.message}</div>
             <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-red-500" />
           </motion.div>

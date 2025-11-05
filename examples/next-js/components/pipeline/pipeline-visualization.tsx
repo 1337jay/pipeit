@@ -101,7 +101,7 @@ export function PipelineVisualization({
   }, [visualPipeline, pipelineState]);
 
   return (
-    <div className="w-full overflow-x-auto py-8">
+    <div className="w-full flex flex-col items-center justify-center overflow-x-auto py-8">
       {/* Strategy indicator */}
       <motion.div
         className="mb-4 text-center"
@@ -109,8 +109,8 @@ export function PipelineVisualization({
         animate={{ opacity: 1, y: 0 }}
         transition={springs.default}
       >
-        <span className="text-xs font-mono text-gray-500">
-          Strategy: <span className="font-semibold text-gray-700">{strategy}</span>
+        <span className="text-body-md font-berkeley-mono text-gray-500">
+          Strategy: <span className="font-inter-semibold text-gray-700">{strategy}</span>
         </span>
       </motion.div>
 
@@ -134,7 +134,9 @@ export function PipelineVisualization({
         </motion.div>
       )}
 
-      <div className="flex flex-col items-center gap-8 min-w-max px-8">
+      <div className="flex flex-col items-center justify-center gap-8 min-w-max px-8">
+      <div className="flex flex-row items-center justify-center">
+
         {/* Render items */}
         {renderItems.map((item, index) => {
           // Check if previous item is completed
@@ -195,15 +197,15 @@ export function PipelineVisualization({
             </div>
           );
         })}
-
+        </div>
         {/* Pipeline state indicator */}
         <motion.div
-          className="mt-4 text-sm font-mono text-gray-500"
+          className="mt-4 text-body-md font-berkeley-mono text-gray-500"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.5 }}
         >
-          Status: <span className="font-semibold">{pipelineState}</span>
+          Status: <span className="font-inter-semibold">{pipelineState}</span>
         </motion.div>
       </div>
     </div>

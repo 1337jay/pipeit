@@ -54,7 +54,7 @@ export function TransactionForm({
             <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="space-y-2">
-                        <label htmlFor="recipient" className="text-sm font-medium">
+                        <label htmlFor="recipient" className="text-body-md font-inter-medium">
                             Recipient Address
                         </label>
                         <input
@@ -63,14 +63,14 @@ export function TransactionForm({
                             value={recipient}
                             onChange={e => setRecipient(e.target.value)}
                             placeholder="Enter Solana address"
-                            className="w-full px-3 py-2 border rounded-lg text-sm font-mono"
+                            className="w-full px-3 py-2 border rounded-lg text-body-md font-berkeley-mono"
                             disabled={disabled || loading}
                             required
                         />
                     </div>
 
                     <div className="space-y-2">
-                        <label htmlFor="amount" className="text-sm font-medium">
+                        <label htmlFor="amount" className="text-body-md font-inter-medium">
                             Amount (SOL)
                         </label>
                         <input
@@ -80,7 +80,7 @@ export function TransactionForm({
                             min="0.001"
                             value={amount}
                             onChange={e => setAmount(e.target.value)}
-                            className="w-full px-3 py-2 border rounded-lg text-sm"
+                            className="w-full px-3 py-2 border rounded-lg text-body-md"
                             disabled={disabled || loading}
                             required
                         />
@@ -88,7 +88,7 @@ export function TransactionForm({
 
                     {error && (
                         <Alert variant="destructive">
-                            <p className="text-sm">{error}</p>
+                            <p className="text-body-md">{error}</p>
                         </Alert>
                     )}
 
