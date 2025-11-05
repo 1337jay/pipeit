@@ -4,9 +4,10 @@ import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { IconLine3Horizontal, IconXmarkCircleFill } from 'symbols-react';
-import { ConnectButton, ClusterSelector, AccountSwitcher } from '@/components/connector';
+import { ClusterSelector, AccountSwitcher } from '@/components/connector';
 import { useConnector } from '@solana/connector';
 import { cn } from '@/lib/utils';
+import { Logo } from './logo';
 
 const navItems = [
     { href: '/', label: 'Home' },
@@ -29,18 +30,14 @@ export const AppNav = React.memo(() => {
 
     return (
         <>
-            <nav className="sticky top-0">
-                <div className="max-w-7xl mx-auto border-r border-l border-b border-sand-200 bg-bg1/70 backdrop-blur-md">
+            <nav className="sticky top-0 z-50">
+                <div className="max-w-7xl mx-auto border-r border-l border-b border-sand-200 bg-[var(--color-bg1)]/70 backdrop-blur-md">
                     <div className="px-4 sm:px-6 lg:px-8 py-4">
                         <div className="flex items-center justify-between h-16">
                             {/* Logo */}
-                            <Link href="/" className="flex items-center gap-1 z-10">
-                                <span
-                                    className="text-xl font-bold text-gray-900 mt-[-4px]"
-                                    style={{ fontFamily: 'var(--font-abc-diatype)' }}
-                                >
-                                    Pipeit
-                                </span>
+                            <Link href="/" className="flex items-center gap-2 z-10">
+                                <Logo width={32} height={32} />
+                                <span className="text-2xl font-abc-diatype-medium font-bold text-gray-900">Pipeit</span>
                             </Link>
 
                             {/* Desktop Navigation */}
@@ -64,17 +61,6 @@ export const AppNav = React.memo(() => {
                                         </Link>
                                     );
                                 })}
-                            </div>
-
-                            {/* Right side - Connector components */}
-                            <div className="hidden md:flex items-center gap-2">
-                                {connected && (
-                                    <>
-                                        <ClusterSelector />
-                                        <AccountSwitcher />
-                                    </>
-                                )}
-                                <ConnectButton />
                             </div>
 
                             {/* Mobile Menu Trigger */}
@@ -101,17 +87,12 @@ export const AppNav = React.memo(() => {
 
                     {/* Mobile Menu replacing nav */}
                     <div className="fixed top-0 left-0 right-0 z-50 animate-in slide-in-from-top-2 fade-in-0 duration-150 ease-[cubic-bezier(0.32,0.72,0,1)]">
-                        <div className="max-w-7xl mx-auto border-r border-l border-b border-border-low bg-bg1/80 backdrop-blur-md">
+                        <div className="max-w-7xl mx-auto border-r border-l border-b border-border-low bg-[var(--color-bg1)]/80 backdrop-blur-md">
                             <div className="px-4 sm:px-6 lg:px-8 py-4">
                                 <div className="flex items-center justify-between h-16">
                                     {/* Logo */}
-                                    <Link href="/" className="flex items-center gap-1" onClick={closeMobileMenu}>
-                                        <span
-                                            className="text-xl font-bold text-gray-900 mt-[-4px]"
-                                            style={{ fontFamily: 'var(--font-abc-diatype)' }}
-                                        >
-                                            Pipeit
-                                        </span>
+                                    <Link href="/" className="flex items-center gap-2" onClick={closeMobileMenu}>
+                                        <Logo width={28} height={28} />
                                     </Link>
 
                                     {/* Close Button */}
@@ -128,7 +109,7 @@ export const AppNav = React.memo(() => {
 
                         {/* Mobile Menu Content */}
                         <div className="animate-in slide-in-from-top-2 fade-in-0 duration-150 delay-75 ease-[cubic-bezier(0.32,0.72,0,1)]">
-                            <div className="max-w-7xl mx-auto border-r border-l border-b border-border-low bg-bg1">
+                            <div className="max-w-7xl mx-auto border-r border-l border-b border-border-low bg-[var(--color-bg1)]">
                                 <div className="p-6">
                                     {/* Navigation Links */}
                                     <div className="space-y-2">
@@ -159,21 +140,16 @@ export const AppNav = React.memo(() => {
                                     </div>
 
                                     {/* Connector components */}
-                                    <div className="mt-6 pt-4 border-t border-border-low space-y-2">
-                                        {connected && (
-                                            <>
-                                                <div className="px-3 py-2">
-                                                    <ClusterSelector />
-                                                </div>
-                                                <div className="px-3 py-2">
-                                                    <AccountSwitcher />
-                                                </div>
-                                            </>
-                                        )}
-                                        <div className="px-3 py-2">
-                                            <ConnectButton />
+                                    {connected && (
+                                        <div className="mt-6 pt-4 border-t border-border-low space-y-2">
+                                            <div className="px-3 py-2">
+                                                <ClusterSelector />
+                                            </div>
+                                            <div className="px-3 py-2">
+                                                <AccountSwitcher />
+                                            </div>
                                         </div>
-                                    </div>
+                                    )}
                                 </div>
                             </div>
                         </div>

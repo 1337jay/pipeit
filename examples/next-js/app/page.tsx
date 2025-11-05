@@ -1,20 +1,78 @@
-'use client';
+import { Hero, Benefits, CodeComparison, FeatureExample, PipelineExample } from '@/components/landing';
 
-import { TransactionDemo } from '@/components/transactions';
+const beforeCode = `import { 
+  createSolanaRpc,
+  createSolanaRpcSubscriptions,
+  createTransactionMessage,
+  setTransactionMessageFeePayer,
+  setTransactionMessageLifetimeUsingBlockhash,
+  appendTransactionMessageInstructions,
+  signTransaction,
+  sendTransaction,
+  address,
+  lamports,
+  pipe
+} from '@solana/kit';
+import { getTransferSolInstruction } from '@solana-program/system';
+
+const rpc = createSolanaRpc(rpcUrl);
+const rpcSubscriptions = createSolanaRpcSubscriptions(rpcUrl.replace('http', 'ws'));
+const { value: latestBlockhash } = await rpc.getLatestBlockhash().send();
+
+const transferInstruction = getTransferSolInstruction({
+  source: signer.address,
+  destination: address(recipientAddress),
+  amount: lamports(BigInt(amount * 1_000_000_000)),
+});
+
+const transactionMessage = pipe(
+  createTransactionMessage({ version: 0 }),
+  tx => setTransactionMessageFeePayer(signer.address, tx),
+  tx => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, tx),
+  tx => appendTransactionMessageInstructions([transferInstruction], tx)
+);
+
+const signedTransaction = await signTransaction([signer], transactionMessage);
+const signature = await sendTransaction(rpc, signedTransaction).send();`;
+
+const afterCode = `import { transaction } from '@pipeit/tx-builder';
+import { getTransferSolInstruction } from 'gill/programs';
+import { address, lamports, LAMPORTS_PER_SOL } from 'gill';
+
+const transferInstruction = getTransferSolInstruction({
+  source: signer,
+  destination: address(recipientAddress),
+  amount: lamports(BigInt(amount * LAMPORTS_PER_SOL)),
+});
+
+const signature = await transaction({ 
+  autoRetry: true, 
+  priorityLevel: 'medium' 
+})
+  .addInstruction(transferInstruction)
+  .execute({
+    feePayer: signer,
+    rpc,
+    rpcSubscriptions,
+    commitment: 'confirmed',
+  });`;
 
 export default function Home() {
     return (
-        <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
-            <main className="container mx-auto px-4 py-6">
-                <div className="max-w-7xl mx-auto">
-                    <div className="mb-6">
-                        <h1 className="text-h2">ConnectorKit Examples</h1>
-                        <p className="text-body-l text-muted-foreground mt-1">
-                            Test transactions, Kit signers, chain utilities, and connection abstraction
-                        </p>
-                    </div>
-                    <TransactionDemo />
-                </div>
+        <div className="max-w-7xl mx-auto min-h-screen bg-bg1 border-r border-l border-sand-200">
+            <main className="container mx-auto">
+                <Hero />
+                <Benefits />
+                <CodeComparison 
+                    beforeTitle="SolanaKit"
+                    beforeDescription="Transfer SOL using Solana Kit - manual blockhash, signing, and sending"
+                    beforeCode={beforeCode}
+                    afterTitle="PipeIt"
+                    afterDescription="Transfer SOL using Pipe It - automatic blockhash, retry, and confirmation"
+                    afterCode={afterCode}
+                />
+                <FeatureExample />
+                <PipelineExample />
             </main>
         </div>
     );
