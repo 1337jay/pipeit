@@ -52,7 +52,7 @@ export function BatchGroup({ visualPipeline, stepNames, batchIndex }: BatchGroup
 
   return (
     <motion.div
-      className="relative border-2 border-dashed border-purple-400 rounded-lg p-4 bg-purple-50/50"
+      className="relative border-2 border-dashed border-purple-400 rounded-lg p-4 bg-purple-50/50 backdrop-blur-sm min-w-[225px]"
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{
         opacity: 1,

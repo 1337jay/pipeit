@@ -1,6 +1,6 @@
 'use client';
 
-import { useConnector, useAccount } from '@solana/connector';
+import { useConnector } from '@solana/connector';
 import { Button } from '@/components/ui/button';
 import {
     DropdownMenu,
@@ -13,7 +13,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useState } from 'react';
 import { WalletModal } from './wallet-modal';
-import { Wallet, Copy, LogOut, ChevronDown, Check } from 'lucide-react';
+import { Wallet, LogOut, ChevronDown, AlertCircle } from 'lucide-react';
 
 interface ConnectButtonProps {
     className?: string;
@@ -22,13 +22,11 @@ interface ConnectButtonProps {
 export function ConnectButton({ className }: ConnectButtonProps) {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const { connected, connecting, selectedWallet, selectedAccount, disconnect, wallets } = useConnector();
-    const { copied, copy } = useAccount();
 
     if (connecting) {
         return (
-            <Button disabled className={className}>
-                <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                Connecting...
+            <Button size="sm" disabled className={className}>
+                <div className=" h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
             </Button>
         );
     }
@@ -43,41 +41,36 @@ export function ConnectButton({ className }: ConnectButtonProps) {
         return (
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <Button variant="outline" className={className}>
-                        <Avatar className="mr-2 h-5 w-5">
+                    <Button variant="outline" size="sm" className={className}>
+                        <Avatar className="h-5 w-5">
                             {walletIcon && <AvatarImage src={walletIcon} alt={selectedWallet.name} />}
                             <AvatarFallback>
                                 <Wallet className="h-3 w-3" />
                             </AvatarFallback>
                         </Avatar>
-                        <span className="font-berkeley-mono text-body-md">{shortAddress}</span>
                         <ChevronDown className="ml-2 h-4 w-4 opacity-50" />
                     </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuContent align="end" className="w-72">
                     <DropdownMenuLabel>
                         <div className="flex flex-col space-y-1">
-                            <p className="text-body-md font-inter-medium leading-none">{selectedWallet.name}</p>
+                            <p className="text-xs font-abc-diatype leading-none"><span className="opacity-50">Connected to</span> {selectedWallet.name}</p>
                             <p className="text-body-md font-berkeley-mono text-muted-foreground">{shortAddress}</p>
                         </div>
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={copy}>
-                        {copied ? (
-                            <>
-                                <Check className="mr-2 h-4 w-4" />
-                                Copied!
-                            </>
-                        ) : (
-                            <>
-                                <Copy className="mr-2 h-4 w-4" />
-                                Copy Address
-                            </>
-                        )}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => disconnect()} className="text-red-600">
-                        <LogOut className="mr-2 h-4 w-4" />
-                        Disconnect
+                    <div className="px-2 py-1.5">
+                        <div className="flex items-start gap-2">
+                            <AlertCircle className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                            <p className="text-xs text-muted-foreground leading-relaxed">
+                                These examples execute SOL transfers (self-transfers to your own address). Each transaction pays standard network fees.
+                            </p>
+                        </div>
+                    </div>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => disconnect()} className="cursor-pointer group hover:!bg-red-600/5 transition-all duration-150 ease-in-out">
+                        <LogOut className="mr-2 h-4 w-4 group-hover:text-red-600" />
+                        <span className="font-berkeley-mono group-hover:text-red-600">Disconnect</span>
                     </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
@@ -86,9 +79,8 @@ export function ConnectButton({ className }: ConnectButtonProps) {
 
     return (
         <>
-            <Button onClick={() => setIsModalOpen(true)} className={className}>
-                <Wallet className="mr-2 h-4 w-4" />
-                Connect Wallet
+            <Button size="sm" onClick={() => setIsModalOpen(true)} className={className}>
+                Connect
             </Button>
             <WalletModal open={isModalOpen} onOpenChange={setIsModalOpen} />
         </>

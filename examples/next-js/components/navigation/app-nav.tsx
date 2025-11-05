@@ -11,8 +11,8 @@ import { Logo } from './logo';
 
 const navItems = [
     { href: '/', label: 'Home' },
-    { href: '/transactions', label: 'Transactions' },
-    { href: '/pipelines', label: 'Pipelines' },
+    // { href: '/transactions', label: 'Transactions' },
+    { href: '/playground', label: 'Playground' },
 ];
 
 export const AppNav = React.memo(() => {
