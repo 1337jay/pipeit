@@ -15,8 +15,8 @@ import type {
   SignatureNotificationsApi,
   SlotNotificationsApi,
 } from 'gill';
-import { transaction } from './transaction-builder.js';
-import type { TransactionBuilderConfig } from './transaction-builder.js';
+import { transaction } from './transaction-builder';
+import type { TransactionBuilderConfig } from './transaction-builder';
 
 /**
  * Quick transfer SOL between accounts.

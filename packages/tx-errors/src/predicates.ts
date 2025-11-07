@@ -15,7 +15,7 @@ import type {
   ProgramError,
   TransactionTooLargeError,
   InvalidTransactionError,
-} from './errors.js';
+} from './errors';
 
 /**
  * Check if error is a TransactionError.

@@ -12,7 +12,7 @@ import type {
   AccountNotFoundError,
   ProgramError,
   TransactionTooLargeError,
-} from './errors.js';
+} from './errors';
 
 /**
  * Get a human-readable error message for a transaction error.

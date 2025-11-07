@@ -235,7 +235,7 @@ export function useStateAnimations(state: StepState, motionValues: StepMotionVal
 
   // Width & content opacity
   useEffect(() => {
-    const hasResult = state.type === 'confirmed';
+    const hasResult = state.type === 'confirmed' || state.type === 'failed';
 
     if (!hasResult) {
       motionValues.nodeWidth.set(NODE_WIDTH); // if you want this animated, swap to animate(...)

@@ -6,9 +6,9 @@
  * @packageDocumentation
  */
 
-export { OpinionatedTransactionBuilder, transaction } from './transaction-builder.js';
-export type { TransactionBuilderConfig } from './transaction-builder.js';
-export * from './helpers.js';
+export { OpinionatedTransactionBuilder, transaction } from './transaction-builder';
+export type { TransactionBuilderConfig } from './transaction-builder';
+export * from './helpers';
 
 
 

@@ -1,4 +1,5 @@
-import type { TransactionPipeline, ExecuteParams } from '@pipeit/tx-orchestration';
+import { TransactionPipeline } from '@pipeit/tx-orchestration';
+import type { ExecuteParams } from '@pipeit/tx-orchestration';
 
 /**
  * State of an individual pipeline step.
@@ -46,10 +47,10 @@ export class VisualPipeline {
 
     // Hook into pipeline events to track state
     this.pipeline
-      .onStepStart((stepName) => {
+      .onStepStart((stepName: string) => {
         this.setStepState(stepName, { type: 'building' });
       })
-      .onStepComplete((stepName, result) => {
+      .onStepComplete((stepName: string, result: any) => {
         // Extract signature and estimate cost
         const signature = result?.signature || (typeof result === 'string' ? result : '');
         const cost = 0.000005; // Base transaction fee in SOL (estimate)
@@ -62,7 +63,8 @@ export class VisualPipeline {
 
         this.totalCost += cost;
       })
-      .onStepError((stepName, error) => {
+      .onStepError((stepName: string, error: Error) => {
+        console.error(`Step ${stepName} failed:`, error);
         this.setStepState(stepName, { type: 'failed', error });
         this.state = 'failed';
         this.executionEndTime = Date.now();
@@ -86,7 +88,7 @@ export class VisualPipeline {
       const results = await this.pipeline.execute(params);
 
       // Mark all completed steps as confirmed if not already
-      results.forEach((result, stepName) => {
+      results.forEach((result: any, stepName: string) => {
         const currentState = this.getStepState(stepName);
         if (currentState.type !== 'confirmed' && currentState.type !== 'failed') {
           const signature = result?.signature || (typeof result === 'string' ? result : '');
@@ -104,6 +106,12 @@ export class VisualPipeline {
 
       return results;
     } catch (error) {
+      this.steps.forEach((step) => {
+        const currentState = this.getStepState(step.name);
+        if (currentState.type !== 'confirmed' && currentState.type !== 'failed') {
+          this.setStepState(step.name, { type: 'failed', error: error as Error });
+        }
+      });
       this.state = 'failed';
       this.executionEndTime = Date.now();
       this.notifyListeners();

@@ -6,9 +6,9 @@
  * @packageDocumentation
  */
 
-export * from './errors.js';
-export * from './predicates.js';
-export * from './messages.js';
+export * from './errors';
+export * from './predicates';
+export * from './messages';
 
 
 

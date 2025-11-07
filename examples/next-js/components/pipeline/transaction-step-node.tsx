@@ -15,6 +15,8 @@ import { StepOverlay } from './step-overlay';
 import { stepVariants, getStepShadow } from '@/lib/step-variants';
 import { colors, effects, springs } from '@/lib/pipeline-animations';
 import { GLOW_COLORS } from '@/lib/pipeline-colors';
+import { IconCheckmark } from './icons/checkmark';
+import { IconXmark } from './icons/xmark';
 
 interface TransactionStepNodeProps {
   visualPipeline: VisualPipeline;
@@ -37,7 +39,8 @@ function TransactionStepNodeComponent({
   const isFailed = state.type === 'failed';
   const isConfirmed = state.type === 'confirmed';
   const isExecuting =
-    state.type === 'building' || state.type === 'signing' || state.type === 'sending';
+    (state.type === 'building' || state.type === 'signing' || state.type === 'sending') &&
+    !isFailed;
 
   // Get motion values
   const motionValues = useStepMotion();
@@ -152,9 +155,9 @@ function TransactionStepNodeComponent({
                 transition={{ repeat: Infinity, duration: 0.8 }}
               />
             ) : isConfirmed ? (
-              <span className="text-lg">✓</span>
+              <IconCheckmark className="h-4 w-4" fill="white" />
             ) : isFailed ? (
-              <span className="text-lg">✗</span>
+              <IconXmark className="h-4 w-4" fill="white" />
             ) : (
               <span className="text-body-md">{stepName.slice(0, 3)}</span>
             )}

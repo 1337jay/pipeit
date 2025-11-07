@@ -6,7 +6,7 @@
  * @packageDocumentation
  */
 
-export * from './pipeline.js';
-export type { StepContext } from './pipeline.js';
-export type { InstructionStep, TransactionStep, AtomicGroupStep, PipelineStep, ExecutionStrategy, PipelineHooks } from './pipeline.js';
+export * from './pipeline';
+export type { StepContext, ExecuteParams } from './pipeline';
+export type { InstructionStep, TransactionStep, AtomicGroupStep, PipelineStep, ExecutionStrategy, PipelineHooks } from './pipeline';
 
