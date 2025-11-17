@@ -7,7 +7,7 @@
  * @packageDocumentation
  */
 
-import type { Address } from 'gill';
+import type { Address, Instruction } from 'gill';
 import type { IdlInstruction } from '../../types.js';
 import type { DiscoveryContext } from '../types.js';
 
@@ -64,5 +64,44 @@ export interface ProtocolAccountPlugin {
     params: Record<string, unknown>,
     context: DiscoveryContext
   ) => Promise<Record<string, unknown>>;
+
+  /**
+   * Optional: Prepare additional instructions to execute before or after the main instruction.
+   *
+   * Useful for plugins that need to set up accounts (e.g., wrap SOL) or clean up after
+   * the main instruction (e.g., unwrap SOL). These instructions will be included in the
+   * same transaction as the main instruction.
+   *
+   * @param instruction - Instruction definition from IDL
+   * @param params - Instruction parameters (after prepareParams if applicable)
+   * @param context - Discovery context
+   * @returns Object containing pre and post instructions
+   */
+  prepareInstructions?: (
+    instruction: IdlInstruction,
+    params: Record<string, unknown>,
+    context: DiscoveryContext
+  ) => Promise<{
+    preInstructions?: Instruction[];
+    postInstructions?: Instruction[];
+  }>;
+
+  /**
+   * Optional: Get remaining accounts that should be added after IDL-defined accounts.
+   *
+   * Some instructions (like Raydium swap_v2) require additional accounts that aren't
+   * listed in the IDL but are needed by the program. These accounts are appended
+   * to the instruction's accounts array after all IDL-defined accounts.
+   *
+   * @param instruction - Instruction definition from IDL
+   * @param params - Instruction parameters (after prepareParams if applicable)
+   * @param context - Discovery context
+   * @returns Array of account addresses with their roles (0=readonly, 1=writable, 2=signer, 3=signer+writable)
+   */
+  getRemainingAccounts?: (
+    instruction: IdlInstruction,
+    params: Record<string, unknown>,
+    context: DiscoveryContext
+  ) => Promise<Array<{ address: Address; role: number }>>;
 }
 

@@ -59,8 +59,17 @@ export * from './discovery/index.js';
 
 // Example Plugins
 export { JupiterSwapPlugin, JUPITER_V6_PROGRAM } from './discovery/plugins/jupiter.js';
+export type { JupiterApiConfig } from './discovery/plugins/jupiter.js';
 export { MetaplexMetadataPlugin, METAPLEX_PROGRAM } from './discovery/plugins/metaplex.js';
-export { KaminoLendingPlugin, KAMINO_LENDING_PROGRAM } from './discovery/plugins/kamino.js';
+export {
+  KaminoLendingPlugin,
+  KAMINO_LENDING_PROGRAM,
+  KAMINO_MAINNET_LENDING_MARKET,
+} from './discovery/plugins/kamino.js';
+export {
+  RaydiumSwapPlugin,
+  RAYDIUM_CLMM_PROGRAM,
+} from './discovery/plugins/raydium.js';
 
 // Seed serialization (for PDA derivation)
 export { serializeSeedValue } from './seed-serializer.js';

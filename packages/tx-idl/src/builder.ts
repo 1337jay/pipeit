@@ -150,6 +150,20 @@ export class IdlInstructionBuilder {
 
     // Get program address
     const programAddress = this.idl.metadata?.address || context.programId;
+    
+    // Debug: Log accounts for Raydium swap
+    if (this.instruction.name === 'swap_v2') {
+      console.log('[Builder] Built swap_v2 instruction with accounts:', {
+        accountCount: resolvedAccounts.length,
+        accounts: resolvedAccounts.map((acc, idx) => ({
+          index: idx,
+          name: this.instruction.accounts[idx]?.name || 'unknown',
+          address: acc.address.toString(),
+          role: acc.role,
+          roleDesc: acc.role === 0 ? 'read-only' : acc.role === 1 ? 'writable' : 'signer+writable',
+        })),
+      });
+    }
 
     return {
       programAddress: programAddress as Address,
@@ -184,19 +198,27 @@ export class IdlInstructionBuilder {
    * @returns Array of account requirements
    */
   getAccountRequirements(): AccountRequirement[] {
-    return this.instruction.accounts.map((acc) => {
+    const flattenAccounts = (acc: typeof this.instruction.accounts[0]): AccountRequirement[] => {
+      // If this is a composite account, flatten its nested accounts
+      if (acc.accounts) {
+        return acc.accounts.flatMap(flattenAccounts);
+      }
+      
+      // Regular account
       const req: AccountRequirement = {
         name: acc.name,
-        isMut: acc.isMut,
-        isSigner: acc.isSigner,
+        isMut: acc.isMut ?? false,
+        isSigner: acc.isSigner ?? false,
         isOptional: acc.isOptional ?? false,
         isPda: !!acc.pda,
       };
       if (acc.docs) {
         req.docs = acc.docs;
       }
-      return req;
-    });
+      return [req];
+    };
+
+    return this.instruction.accounts.flatMap(flattenAccounts);
   }
 
   /**

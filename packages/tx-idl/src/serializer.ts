@@ -95,7 +95,11 @@ export function createInstructionEncoder(
 
   // Add discriminator if present
   if (instruction.discriminant) {
-    const discriminatorEncoder = getU8Encoder() as Encoder<unknown>;
+    // Handle both single-byte and byte array discriminators
+    const discriminatorEncoder =
+      instruction.discriminant.type === 'bytes' && Array.isArray(instruction.discriminant.value)
+        ? (getArrayEncoder(getU8Encoder(), { size: 8 }) as Encoder<unknown>)
+        : (getU8Encoder() as Encoder<unknown>);
 
     if (argsEncoder) {
       // Combine discriminator + args
@@ -138,7 +142,11 @@ export function createInstructionDecoder(
 
   // Add discriminator if present
   if (instruction.discriminant) {
-    const discriminatorDecoder = getU8Decoder() as Decoder<unknown>;
+    // Handle both single-byte and byte array discriminators
+    const discriminatorDecoder =
+      instruction.discriminant.type === 'bytes' && Array.isArray(instruction.discriminant.value)
+        ? (getArrayDecoder(getU8Decoder(), { size: 8 }) as Decoder<unknown>)
+        : (getU8Decoder() as Decoder<unknown>);
 
     if (argsDecoder) {
       // Combine discriminator + args
@@ -432,13 +440,120 @@ export function encodeInstructionData(
   params: Record<string, unknown>,
   context: SerializationContext
 ): Uint8Array {
+  // Check if pre-encoded instruction data is provided (e.g., from Jupiter API)
+  // This allows plugins to provide their own instruction data instead of encoding from params
+  if (params.__jupiterInstructionData && typeof params.__jupiterInstructionData === 'string') {
+    // Jupiter returns instruction data as base64 string
+    try {
+      const decoded = Uint8Array.from(atob(params.__jupiterInstructionData), c => c.charCodeAt(0));
+      console.log('[Serializer] Using pre-encoded Jupiter instruction data, length:', decoded.length);
+      return decoded;
+    } catch (error) {
+      console.warn('[Serializer] Failed to decode Jupiter instruction data, falling back to IDL encoding:', error);
+      // Fall through to normal encoding
+    }
+  }
+  
+  // Log discriminator information for debugging
+  if (instruction.discriminant) {
+    console.log('[Serializer] Encoding instruction with discriminator:', {
+      instructionName: instruction.name,
+      discriminantType: instruction.discriminant.type,
+      discriminantValue:
+        instruction.discriminant.type === 'bytes' && Array.isArray(instruction.discriminant.value)
+          ? `[${instruction.discriminant.value.join(', ')}]`
+          : instruction.discriminant.value,
+    });
+  }
+  
   const encoder = createInstructionEncoder(instruction, context);
+  
+  // Filter params to only include fields defined in instruction.args
+  // This removes non-IDL parameters like inputMint, outputMint, poolAddress, etc.
+  const validArgNames = new Set(instruction.args.map(arg => arg.name));
+  const filteredParams: Record<string, unknown> = {};
+  
+  for (const [key, value] of Object.entries(params)) {
+    if (validArgNames.has(key)) {
+      filteredParams[key] = value;
+    }
+  }
+  
+  console.log('[Serializer] Filtered params:', {
+    instructionName: instruction.name,
+    originalKeys: Object.keys(params),
+    filteredKeys: Object.keys(filteredParams),
+    expectedArgs: instruction.args.map(arg => arg.name),
+  });
+  
+  // Validate that all required parameters are present and not undefined
+  const missingParams: string[] = [];
+  for (const arg of instruction.args) {
+    if (!(arg.name in filteredParams) || filteredParams[arg.name] === undefined) {
+      missingParams.push(arg.name);
+    }
+  }
+  
+  if (missingParams.length > 0) {
+    throw new Error(
+      `Missing required parameters for instruction ${instruction.name}: ${missingParams.join(', ')}. ` +
+      `Provided params: ${Object.keys(params).join(', ')}`
+    );
+  }
+  
   // If discriminator is present, the encoder expects it in the params
+  // For byte array discriminators, pass the array; for single-byte, pass the number
   const paramsWithDiscriminator = instruction.discriminant
-    ? { discriminator: instruction.discriminant.value, ...params }
-    : params;
+    ? {
+        discriminator:
+          instruction.discriminant.type === 'bytes' && Array.isArray(instruction.discriminant.value)
+            ? instruction.discriminant.value
+            : instruction.discriminant.value,
+        ...filteredParams,
+      }
+    : filteredParams;
+  
   // Convert ReadonlyUint8Array to Uint8Array
   // Type assertion needed because encoder expects specific types, but we're using Record<string, unknown>
-  const encoded = encoder.encode(paramsWithDiscriminator as Record<string, unknown>);
-  return new Uint8Array(encoded);
+  try {
+    console.log('[Serializer] About to encode with discriminator:', {
+      instructionName: instruction.name,
+      hasDiscriminant: !!instruction.discriminant,
+      discriminantType: instruction.discriminant?.type,
+      discriminantValue: instruction.discriminant?.value,
+      paramsWithDiscriminator,
+    });
+    
+    const encoded = encoder.encode(paramsWithDiscriminator as Record<string, unknown>);
+    const result = new Uint8Array(encoded);
+    
+    // Log encoded instruction data for debugging
+    console.log('[Serializer] Encoded instruction data:', {
+      instructionName: instruction.name,
+      totalLength: result.length,
+      firstBytes: `[${Array.from(result.slice(0, Math.min(32, result.length))).join(', ')}]`,
+      discriminatorBytes: instruction.discriminant ? `[${Array.from(result.slice(0, 8)).join(', ')}]` : 'none',
+      expectedDiscriminator: instruction.discriminant?.type === 'bytes' && Array.isArray(instruction.discriminant.value) 
+        ? `[${instruction.discriminant.value.join(', ')}]` 
+        : instruction.discriminant?.value,
+    });
+    
+    return result;
+  } catch (error) {
+    // Provide more helpful error message if encoding fails
+    if (error instanceof TypeError && error.message.includes('BigInt')) {
+      const undefinedParams: string[] = [];
+      for (const arg of instruction.args) {
+        const value = params[arg.name];
+        if (value === undefined || value === null) {
+          undefinedParams.push(`${arg.name} (${JSON.stringify(arg.type)})`);
+        }
+      }
+      throw new Error(
+        `Failed to encode instruction ${instruction.name}: Cannot convert undefined/null to BigInt. ` +
+        `Check these parameters: ${undefinedParams.join(', ')}`
+      );
+    }
+    throw error;
+  }
 }

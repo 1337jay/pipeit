@@ -146,7 +146,23 @@ export async function fetchIdl(
 export function loadIdlFromJson(idl: string | ProgramIdl): ProgramIdl {
   if (typeof idl === 'string') {
     const parsed = JSON.parse(idl) as ProgramIdl;
+    // Debug: Check if discriminator exists in raw JSON
+    if ((parsed as any).name === 'amm_v3') {
+      const swapV2 = (parsed as any).instructions?.find((i: any) => i.name === 'swap_v2');
+      console.log('[Fetcher] loadIdlFromJson (string path) - swap_v2 has discriminator?', {
+        hasDiscriminator: !!swapV2?.discriminator,
+        discriminatorValue: swapV2?.discriminator,
+      });
+    }
     return parsed;
+  }
+  // Debug: Check if discriminator exists in object
+  if ((idl as any).name === 'amm_v3') {
+    const swapV2 = (idl as any).instructions?.find((i: any) => i.name === 'swap_v2');
+    console.log('[Fetcher] loadIdlFromJson (object path) - swap_v2 has discriminator?', {
+      hasDiscriminator: !!swapV2?.discriminator,
+      discriminatorValue: swapV2?.discriminator,
+    });
   }
   return idl;
 }

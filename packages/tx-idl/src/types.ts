@@ -72,18 +72,32 @@ export interface IdlInstruction {
   /**
    * Discriminator for instruction (optional).
    * Used to identify the instruction variant.
+   * Supports both single-byte format ({ type: "u8", value: 123 })
+   * and Anchor-style 8-byte array format ({ type: "bytes", value: [1,2,3,4,5,6,7,8] }).
    */
-  discriminant?: {
-    /**
-     * Discriminator type (usually 'u8').
-     */
-    type: string;
+  discriminant?:
+    | {
+        /**
+         * Discriminator type ('u8' for single byte).
+         */
+        type: string;
 
-    /**
-     * Discriminator value.
-     */
-    value: number;
-  };
+        /**
+         * Discriminator value (single byte).
+         */
+        value: number;
+      }
+    | {
+        /**
+         * Discriminator type ('bytes' for byte array).
+         */
+        type: 'bytes';
+
+        /**
+         * Discriminator value (8-byte array for Anchor format).
+         */
+        value: number[];
+      };
 
   /**
    * Documentation strings.
@@ -102,13 +116,15 @@ export interface IdlAccountItem {
 
   /**
    * Whether the account is mutable.
+   * Not required for composite accounts (accounts with nested accounts).
    */
-  isMut: boolean;
+  isMut?: boolean;
 
   /**
    * Whether the account must be a signer.
+   * Not required for composite accounts (accounts with nested accounts).
    */
-  isSigner: boolean;
+  isSigner?: boolean;
 
   /**
    * Whether the account is optional.
@@ -129,6 +145,12 @@ export interface IdlAccountItem {
      */
     seeds: PdaSeed[];
   };
+
+  /**
+   * Nested accounts for composite account structures.
+   * When present, this account is a group containing other accounts.
+   */
+  accounts?: IdlAccountItem[];
 }
 
 /**

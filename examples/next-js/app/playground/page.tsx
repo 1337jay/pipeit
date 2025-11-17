@@ -15,6 +15,8 @@ import {
   batchedTransfersCode,
   useMixedPipeline,
   mixedPipelineCode,
+  useRaydiumKaminoPipeline,
+  raydiumKaminoCode,
 } from '@/components/pipeline/examples';
 import { ConnectButton } from '@/components/connector';
 import { PipelineHeaderButton } from '@/components/pipeline/pipeline-header-button';
@@ -48,6 +50,13 @@ const pipelineExamples: PipelineExampleConfig[] = [
     description: 'Instruction and transaction steps - shows when batching breaks',
     hook: useMixedPipeline,
     code: mixedPipelineCode,
+  },
+  {
+    id: 'raydium-kamino',
+    name: 'Raydium + Kamino',
+    description: 'Raydium CLMM swap + Kamino deposit - pure IDL with auto account discovery',
+    hook: useRaydiumKaminoPipeline,
+    code: raydiumKaminoCode,
   },
 ];
 

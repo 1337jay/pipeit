@@ -14,7 +14,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useState } from 'react';
 import { motion } from 'motion/react';
 import { WalletModal } from './wallet-modal';
-import { Wallet, LogOut, ChevronDown, AlertCircle } from 'lucide-react';
+import { Wallet, LogOut, ChevronDown, AlertCircle, Network } from 'lucide-react';
 
 interface ConnectButtonProps {
     className?: string;
@@ -23,7 +23,11 @@ interface ConnectButtonProps {
 export function ConnectButton({ className }: ConnectButtonProps) {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-    const { connected, connecting, selectedWallet, selectedAccount, disconnect, wallets } = useConnector();
+    const connector = useConnector();
+    const { connected, connecting, selectedWallet, selectedAccount, disconnect, wallets, cluster } = connector;
+    
+    const clusterName = cluster?.label || 'Unknown';
+    const isMainnet = cluster?.id === 'solana:mainnet';
 
     if (connecting) {
         return (
@@ -74,6 +78,24 @@ export function ConnectButton({ className }: ConnectButtonProps) {
                                 These examples execute SOL transfers (self-transfers to your own address). Each transaction pays standard network fees.
                             </p>
                         </div>
+                    </div>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel className="flex items-center gap-2">
+                        <Network className="h-3.5 w-3.5" />
+                        <span className="text-xs">Network</span>
+                    </DropdownMenuLabel>
+                    <div className="px-2 py-1.5">
+                        <p className="text-xs text-muted-foreground">
+                            Connected to: <span className="font-berkeley-mono text-foreground">{clusterName}</span>
+                        </p>
+                        {!isMainnet && (
+                            <div className="mt-2 flex items-start gap-2 p-2 bg-amber-50 dark:bg-amber-950 rounded-md">
+                                <AlertCircle className="h-3.5 w-3.5 text-amber-600 mt-0.5 flex-shrink-0" />
+                                <p className="text-xs text-amber-700 dark:text-amber-400 leading-relaxed">
+                                    <strong>Mainnet required:</strong> Raydium pools only exist on mainnet. Disconnect and reconnect to switch.
+                                </p>
+                            </div>
+                        )}
                     </div>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => disconnect()} className="cursor-pointer group hover:!bg-red-600/5 transition-all duration-150 ease-in-out">

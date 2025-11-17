@@ -148,8 +148,8 @@ export class AccountResolver {
         );
       }
 
-      // Determine account role
-      const role = this.determineAccountRole(account);
+      // Determine account role (ensure program accounts are never writable)
+      const role = this.determineAccountRole(account, address, context.programId);
 
       resolved.push({
         address,
@@ -243,9 +243,16 @@ export class AccountResolver {
    * Determine account role from account definition.
    *
    * @param account - Account definition
+   * @param address - Resolved account address (to check if it's the program itself)
+   * @param programId - Program ID being invoked
    * @returns Account role
    */
-  private determineAccountRole(account: IdlAccountItem): AccountRole {
+  private determineAccountRole(account: IdlAccountItem, address: Address, programId: Address): AccountRole {
+    // Program accounts can NEVER be writable - they're invoked, not modified
+    if (address === programId) {
+      return AccountRole.READONLY;
+    }
+    
     if (account.isSigner) {
       return account.isMut ? AccountRole.WRITABLE_SIGNER : AccountRole.READONLY_SIGNER;
     }

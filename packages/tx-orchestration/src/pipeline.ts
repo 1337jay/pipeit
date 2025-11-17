@@ -344,7 +344,7 @@ export class TransactionPipeline {
             step.steps.map((s) => s.createInstruction(ctx))
           );
 
-          const signature = await transaction()
+          const signature = await transaction({ logLevel: 'verbose' })
             .addInstructions(instructions)
             .execute({
               feePayer: params.signer,
@@ -387,7 +387,7 @@ export class TransactionPipeline {
     const instructions = batch.map((b) => b.instruction);
 
     try {
-      const signature = await transaction()
+      const signature = await transaction({ logLevel: 'verbose' })
         .addInstructions(instructions)
         .execute({
           feePayer: params.signer,
@@ -438,7 +438,7 @@ export class TransactionPipeline {
         if (step.type === 'instruction') {
           // Execute instruction as individual transaction
           const instruction = await step.createInstruction(ctx);
-          const signature = await transaction()
+          const signature = await transaction({ logLevel: 'verbose' })
             .addInstruction(instruction)
             .execute({
               feePayer: params.signer,

@@ -79,10 +79,10 @@ export class OpinionatedTransactionBuilder {
   constructor(config: TransactionBuilderConfig = {}) {
     // Opinionated defaults
     this.config = {
-      autoRetry: { maxAttempts: 3, backoff: 'exponential' },
-      priorityLevel: 'medium',
-      computeUnitLimit: 'auto',
-      logLevel: 'minimal',
+      autoRetry: config.autoRetry ?? { maxAttempts: 3, backoff: 'exponential' },
+      priorityLevel: config.priorityLevel ?? 'medium',
+      computeUnitLimit: config.computeUnitLimit ?? 'auto',
+      logLevel: config.logLevel ?? 'minimal',
       version: config.version ?? 'auto',
     };
   }
@@ -194,6 +194,32 @@ export class OpinionatedTransactionBuilder {
         if (attempt === maxAttempts) {
           if (this.config.logLevel === 'verbose') {
             console.error(`[Pipeit] Transaction failed after ${maxAttempts} attempts:`, error);
+            const cause = (error as any)?.cause;
+            if (cause) {
+              console.error('[Pipeit] Error cause:', cause);
+              const causeLogs =
+                (cause as any)?.logs ??
+                (cause as any)?.data?.logs ??
+                (cause as any)?.simulationResponse?.logs;
+              if (causeLogs) {
+                const logs = Array.isArray(causeLogs) ? causeLogs : [String(causeLogs)];
+                console.error('[Pipeit] Cause logs:\n' + logs.join('\n'));
+              }
+            }
+            const context = (error as any)?.context ?? (error as any)?.data;
+            if (context) {
+              console.error('[Pipeit] Error context:', context);
+            }
+          }
+          const maybeLogs =
+            (error as any)?.logs ??
+            (error as any)?.data?.logs ??
+            (error as any)?.simulationResponse?.logs;
+          if (maybeLogs) {
+            const logs = Array.isArray(maybeLogs) ? maybeLogs : [String(maybeLogs)];
+            console.error('[Pipeit] Simulation logs:\n' + logs.join('\n'));
+          } else if (this.config.logLevel === 'verbose') {
+            console.error('[Pipeit] Transaction error details (no logs found):', error);
           }
           throw error;
         }

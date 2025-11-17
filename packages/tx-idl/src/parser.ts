@@ -138,9 +138,24 @@ function parseInstruction(inst: unknown, path: string): IdlInstruction {
 
   const args = instObj.args.map((arg, index) => parseField(arg, `${path}.args[${index}]`));
 
-  const discriminant = instObj.discriminant
-    ? parseDiscriminant(instObj.discriminant, `${path}.discriminant`)
+  // Debug discriminant parsing
+  if (instObj.name === 'swap_v2') {
+    console.log('[Parser] Parsing swap_v2 instruction:', {
+      hasDiscriminator: !!instObj.discriminator,
+      discriminatorRaw: instObj.discriminator,
+      discriminatorType: typeof instObj.discriminator,
+      isArray: Array.isArray(instObj.discriminator),
+    });
+  }
+
+  const discriminant = instObj.discriminator
+    ? parseDiscriminant(instObj.discriminator, `${path}.discriminator`)
     : undefined;
+  
+  // Debug parsed result
+  if (instObj.name === 'swap_v2') {
+    console.log('[Parser] Parsed swap_v2 discriminant:', discriminant);
+  }
 
   const docs = instObj.docs
     ? Array.isArray(instObj.docs)
@@ -179,19 +194,29 @@ function parseAccountItem(acc: unknown, path: string) {
     throw new IdlValidationError(`Account at ${path} must have a name`);
   }
 
+  // Check if this is a composite account (has nested accounts)
+  const isCompositeAccount = Array.isArray(accObj.accounts);
+
+  if (!isCompositeAccount) {
+    // Regular account - require isMut and isSigner
   if (typeof accObj.isMut !== 'boolean') {
     throw new IdlValidationError(`Account at ${path} must have isMut boolean`);
   }
 
   if (typeof accObj.isSigner !== 'boolean') {
     throw new IdlValidationError(`Account at ${path} must have isSigner boolean`);
+    }
   }
 
   const result: IdlAccountItem = {
     name: accObj.name,
-    isMut: accObj.isMut,
-    isSigner: accObj.isSigner,
   };
+
+  // Add isMut and isSigner only for non-composite accounts
+  if (!isCompositeAccount) {
+    result.isMut = accObj.isMut as boolean;
+    result.isSigner = accObj.isSigner as boolean;
+  }
 
   if (typeof accObj.isOptional === 'boolean') {
     result.isOptional = accObj.isOptional;
@@ -206,6 +231,13 @@ function parseAccountItem(acc: unknown, path: string) {
 
   if (accObj.pda) {
     result.pda = parsePda(accObj.pda, `${path}.pda`);
+  }
+
+  // Handle composite accounts (nested accounts)
+  if (isCompositeAccount) {
+    result.accounts = (accObj.accounts as unknown[]).map((nestedAcc, idx) =>
+      parseAccountItem(nestedAcc, `${path}.accounts[${idx}]`)
+    );
   }
 
   return result;
@@ -287,10 +319,33 @@ function parseType(type: unknown, path: string): IdlType {
 
 /**
  * Parse a discriminant.
+ * Supports both object format ({ type: "u8", value: 123 }) and array format ([1, 2, 3, 4, 5, 6, 7, 8]).
  */
 function parseDiscriminant(disc: unknown, path: string) {
+  // Handle array format (Anchor-style 8-byte discriminator)
+  if (Array.isArray(disc)) {
+    if (disc.length !== 8) {
+      throw new IdlValidationError(
+        `Discriminant array at ${path} must have exactly 8 bytes, got ${disc.length}`
+      );
+    }
+    
+    // Validate all elements are numbers
+    if (!disc.every((byte) => typeof byte === 'number' && byte >= 0 && byte <= 255)) {
+      throw new IdlValidationError(
+        `Discriminant array at ${path} must contain only numbers between 0-255`
+      );
+    }
+    
+    return {
+      type: 'bytes' as const,
+      value: disc as number[],
+    };
+  }
+  
+  // Handle object format (legacy)
   if (!disc || typeof disc !== 'object') {
-    throw new IdlValidationError(`Discriminant at ${path} must be an object`);
+    throw new IdlValidationError(`Discriminant at ${path} must be an object or array`);
   }
 
   const discObj = disc as Record<string, unknown>;

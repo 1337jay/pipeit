@@ -240,7 +240,267 @@ export class IdlProgramRegistry {
       resolvedTypes: new Map(),
     };
 
-    return builder.buildInstruction(params, resolvedAccounts, buildContext);
+    let mainInstruction = await builder.buildInstruction(params, resolvedAccounts, buildContext);
+
+    // Check if plugin has getRemainingAccounts hook (for accounts not in IDL)
+    if (plugin?.getRemainingAccounts) {
+      const discoveryContext: DiscoveryContext = {
+        instruction,
+        params,
+        providedAccounts: accounts,
+        signer: context.signer,
+        programId,
+        rpc: context.rpc!,
+        idl,
+      };
+
+      const remainingAccounts = await plugin.getRemainingAccounts(
+        instruction,
+        params,
+        discoveryContext
+      );
+
+      if (remainingAccounts && remainingAccounts.length > 0) {
+        console.log(
+          `[Registry] Plugin ${plugin.id ?? 'unknown'} provided ${remainingAccounts.length} remaining accounts for ${instruction.name}`
+        );
+        // Append remaining accounts to the instruction
+        const remainingAccountMetas = remainingAccounts.map((acc) => ({
+          address: acc.address,
+          role: acc.role,
+        }));
+
+        const existingAccounts = mainInstruction.accounts
+          ? [...mainInstruction.accounts]
+          : [];
+
+        mainInstruction = {
+          ...mainInstruction,
+          accounts: [...existingAccounts, ...remainingAccountMetas],
+        };
+
+        console.log(
+          `[Registry] ${instruction.name} final account count after plugin append: ${mainInstruction.accounts?.length ?? existingAccounts.length}`
+        );
+
+        console.log(`[Registry] Added ${remainingAccounts.length} remaining accounts to ${instruction.name}`);
+      }
+    }
+
+    // Check if plugin has prepareInstructions hook
+    if (plugin?.prepareInstructions) {
+      const discoveryContext: DiscoveryContext = {
+        instruction,
+        params,
+        providedAccounts: accounts,
+        signer: context.signer,
+        programId,
+        rpc: context.rpc!,
+        idl,
+      };
+
+      const { preInstructions, postInstructions } = await plugin.prepareInstructions(
+        instruction,
+        params,
+        discoveryContext
+      );
+
+      // If there are pre/post instructions, return an object with them
+      // Otherwise, return just the instruction for backward compatibility
+      if (preInstructions && preInstructions.length > 0) {
+        return {
+          ...mainInstruction,
+          _preInstructions: preInstructions,
+          _postInstructions: postInstructions,
+        } as Instruction & { _preInstructions?: Instruction[]; _postInstructions?: Instruction[] };
+      }
+      if (postInstructions && postInstructions.length > 0) {
+        return {
+          ...mainInstruction,
+          _preInstructions: preInstructions,
+          _postInstructions: postInstructions,
+        } as Instruction & { _preInstructions?: Instruction[]; _postInstructions?: Instruction[] };
+      }
+    }
+
+    return mainInstruction;
+  }
+
+  /**
+   * Build an instruction with pre/post instructions from plugins.
+   * Returns an object containing the main instruction and any pre/post instructions.
+   *
+   * @param programId - Program address
+   * @param instructionName - Instruction name
+   * @param params - Instruction parameters
+   * @param accounts - Account addresses keyed by account name (optional)
+   * @param context - Build context (signer, programId, etc.)
+   * @returns Object containing main instruction and pre/post instructions
+   */
+  async buildInstructionWithPrePost(
+    programId: Address,
+    instructionName: string,
+    params: Record<string, unknown>,
+    accounts: Record<string, Address> = {},
+    context: {
+      signer: Address;
+      programId: Address;
+      rpc?: Rpc<GetAccountInfoApi>;
+      context?: Record<string, unknown>;
+    }
+  ): Promise<{
+    instruction: Instruction;
+    preInstructions?: Instruction[];
+    postInstructions?: Instruction[];
+  }> {
+    const builder = this.builders.get(programId)?.get(instructionName);
+    const idl = this.cache.get(programId);
+    if (!builder || !idl) {
+      if (!idl) {
+        throw new Error(`Program ${programId} not registered. Call registerProgram() first.`);
+      }
+      throw new Error(
+        `Instruction ${instructionName} not found in program ${programId}. Available: ${idl.instructions.map((i) => i.name).join(', ')}`
+      );
+    }
+
+    const instruction = idl.instructions.find((i) => i.name === instructionName)!;
+
+    // Try protocol-specific plugin first
+    const plugin = this.pluginRegistry.getPlugin(programId, instructionName);
+    let resolvedAccounts = { ...accounts };
+
+    if (plugin) {
+      // Use plugin to discover accounts
+      const discoveryContext: DiscoveryContext = {
+        instruction,
+        params,
+        providedAccounts: accounts,
+        signer: context.signer,
+        programId,
+        rpc: context.rpc!,
+        idl,
+      };
+
+      // Prepare params if plugin has prepareParams hook
+      let finalParams = params;
+      if (plugin.prepareParams) {
+        finalParams = await plugin.prepareParams(params, discoveryContext);
+      }
+
+      // Resolve accounts using plugin
+      const discoveredAccounts = await plugin.resolveAccounts(
+        instruction,
+        finalParams,
+        discoveryContext
+      );
+
+      // Merge discovered accounts with provided (provided overrides discovered)
+      resolvedAccounts = { ...discoveredAccounts, ...accounts };
+
+      // Use prepared params for building
+      params = finalParams;
+    }
+
+    const buildContext: BuildContext = {
+      ...context,
+      idl,
+      resolvedTypes: new Map(),
+    };
+
+    let mainInstruction = await builder.buildInstruction(params, resolvedAccounts, buildContext);
+
+    if (plugin?.getRemainingAccounts) {
+      console.log(`[Registry buildInstructionWithPrePost] Calling getRemainingAccounts for ${instruction.name} with plugin ${plugin.id}`);
+      const discoveryContext: DiscoveryContext = {
+        instruction,
+        params,
+        providedAccounts: accounts,
+        signer: context.signer,
+        programId,
+        rpc: context.rpc!,
+        idl,
+      };
+
+      const remainingAccounts = await plugin.getRemainingAccounts(
+        instruction,
+        params,
+        discoveryContext
+      );
+      
+      console.log(`[Registry buildInstructionWithPrePost] getRemainingAccounts returned ${remainingAccounts?.length ?? 0} accounts`);
+
+      if (remainingAccounts && remainingAccounts.length > 0) {
+        console.log(
+          `[Registry] Plugin ${plugin.id ?? 'unknown'} provided ${remainingAccounts.length} remaining accounts for ${instruction.name}`
+        );
+
+        const remainingAccountMetas = remainingAccounts.map((acc) => ({
+          address: acc.address,
+          role: acc.role,
+        }));
+
+        const existingAccounts = mainInstruction.accounts
+          ? [...mainInstruction.accounts]
+          : [];
+
+        mainInstruction = {
+          ...mainInstruction,
+          accounts: [...existingAccounts, ...remainingAccountMetas],
+        };
+
+        console.log(
+          `[Registry] ${instruction.name} final account count after plugin append: ${mainInstruction.accounts?.length ?? existingAccounts.length}`
+        );
+
+        // Log final account list for swap_v2 debugging
+        if (instruction.name === 'swap_v2' && mainInstruction.accounts) {
+          console.log(`[Registry] swap_v2 final account list:`, {
+            totalAccounts: mainInstruction.accounts.length,
+            idlAccounts: existingAccounts.length,
+            remainingAccounts: remainingAccounts.length,
+            accountAddresses: mainInstruction.accounts.map((acc, idx) => ({
+              index: idx,
+              address: acc.address.toString(),
+              role: acc.role,
+            })),
+          });
+        }
+
+        console.log(`[Registry] Added ${remainingAccounts.length} remaining accounts to ${instruction.name}`);
+      }
+    }
+
+    // Check if plugin has prepareInstructions hook
+    const result: {
+      instruction: Instruction;
+      preInstructions?: Instruction[];
+      postInstructions?: Instruction[];
+    } = {
+      instruction: mainInstruction,
+    };
+
+    if (plugin?.prepareInstructions) {
+      const discoveryContext: DiscoveryContext = {
+        instruction,
+        params,
+        providedAccounts: accounts,
+        signer: context.signer,
+        programId,
+        rpc: context.rpc!,
+        idl,
+      };
+
+      const prepared = await plugin.prepareInstructions(instruction, params, discoveryContext);
+      if (prepared.preInstructions && prepared.preInstructions.length > 0) {
+        result.preInstructions = prepared.preInstructions;
+      }
+      if (prepared.postInstructions && prepared.postInstructions.length > 0) {
+        result.postInstructions = prepared.postInstructions;
+      }
+    }
+
+    return result;
   }
 
   /**
