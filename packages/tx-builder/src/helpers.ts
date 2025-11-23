@@ -4,31 +4,33 @@
  * @packageDocumentation
  */
 
-import type { 
-  Rpc, 
-  TransactionSigner, 
-  RpcSubscriptions, 
+import type {
+  Rpc,
   GetLatestBlockhashApi,
   GetEpochInfoApi,
   GetSignatureStatusesApi,
   SendTransactionApi,
+} from '@solana/rpc';
+import type { TransactionSigner } from '@solana/signers';
+import type {
+  RpcSubscriptions,
   SignatureNotificationsApi,
   SlotNotificationsApi,
-} from 'gill';
-import { transaction } from './transaction-builder';
-import type { TransactionBuilderConfig } from './transaction-builder';
+} from '@solana/rpc-subscriptions';
+import { transaction } from './builder/opinionated.js';
+import type { TransactionBuilderConfig } from './builder/opinionated.js';
 
 /**
  * Quick transfer SOL between accounts.
  * 
  * Note: This helper requires the instruction to be created separately.
- * Use Gill's getTransferSolInstruction from 'gill/programs' to create the instruction.
+ * Use Kit's getTransferSolInstruction from '@solana-program/system' to create the instruction.
  */
 export async function quickTransfer(
   rpc: Rpc<GetEpochInfoApi & GetSignatureStatusesApi & SendTransactionApi & GetLatestBlockhashApi>,
   rpcSubscriptions: RpcSubscriptions<SignatureNotificationsApi & SlotNotificationsApi>,
   opts: {
-    instruction: Parameters<typeof transaction>[0] extends undefined ? never : any; // Instruction type from gill
+    instruction: Parameters<typeof transaction>[0] extends undefined ? never : any; // Instruction type from Kit
     feePayer: TransactionSigner;
     config?: TransactionBuilderConfig;
   }

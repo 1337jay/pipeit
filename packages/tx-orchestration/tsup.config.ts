@@ -4,14 +4,22 @@ export default defineConfig((options) => ({
   entry: ['src/index.ts'],
   format: ['cjs', 'esm'],
   dts: options.watch ? false : {
-    resolve: true,
+    resolve: false,
   },
   tsconfig: './tsconfig.json',
   splitting: false,
   sourcemap: true,
   clean: true,
   treeshake: true,
-  external: ['gill', '@pipeit/tx-errors'],
+  external: [
+    '@solana/kit',
+    '@solana/addresses',
+    '@solana/instructions',
+    '@solana/rpc',
+    '@solana/rpc-subscriptions',
+    '@solana/signers',
+    '@pipeit/tx-builder',
+  ],
 }));
 
 
