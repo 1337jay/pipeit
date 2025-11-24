@@ -8,7 +8,15 @@
 
 // Main export - unified builder
 export { TransactionBuilder } from './builder/builder.js';
-export type { TransactionBuilderConfig, SimulationResult } from './builder/builder.js';
+export type { 
+  TransactionBuilderConfig, 
+  SimulationResult,
+  ExportFormat,
+  ExportedTransaction,
+} from './builder/builder.js';
+
+// Re-export Kit types for convenience
+export type { Base64EncodedWireTransaction } from '@solana/transactions';
 
 // Type-safety types
 export type { BuilderState, RequiredState, BuilderConfig, LifetimeConstraint } from './types.js';

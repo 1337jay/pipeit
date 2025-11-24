@@ -10,154 +10,201 @@ pnpm install @pipeit/tx-builder @solana/kit
 
 ## Features
 
-- ✅ Type-safe builder with compile-time validation
-- ✅ Auto-blockhash fetching
-- ✅ Built-in transaction validation
-- ✅ Simulation support
-- ✅ Auto-retry with exponential backoff
-- ✅ Comprehensive error handling
-- ✅ Kit assertion helpers
+- Type-safe builder with compile-time validation
+- Auto-blockhash fetching
+- Built-in transaction validation
+- Simulation support
+- Export in multiple formats (base64, base58, bytes)
+- Compute budget (priority fees & compute limits)
+- Auto-retry with exponential backoff
+- Comprehensive error handling
 
-## Usage
-
-### Simple API (Recommended)
-
-The simple API provides smart defaults and automatic handling of common transaction building tasks:
+## Quick Start
 
 ```typescript
-import { transaction } from '@pipeit/tx-builder';
-import { createSolanaRpc, createSolanaRpcSubscriptions } from '@solana/kit';
+import { TransactionBuilder } from '@pipeit/tx-builder';
+import { createSolanaRpc, createSolanaRpcSubscriptions, address } from '@solana/kit';
 
 const rpc = createSolanaRpc('https://api.mainnet-beta.solana.com');
 const rpcSubs = createSolanaRpcSubscriptions('wss://api.mainnet-beta.solana.com');
 
-const signature = await transaction({ 
+// Build and execute
+const signature = await new TransactionBuilder({ 
+  rpc,
   autoRetry: true,
-  logLevel: 'verbose'
+  priorityLevel: 'high' 
 })
+  .setFeePayer(address('...'))
   .addInstruction(instruction)
-  .execute({ feePayer: signer, rpc, rpcSubscriptions: rpcSubs });
+  .execute({ rpcSubscriptions: rpcSubs });
 ```
 
-### Advanced API (Type-Safe)
+## Usage
 
-For more control, use the type-safe builder with compile-time validation:
+### Build Message Only
 
 ```typescript
-import { TransactionBuilder } from '@pipeit/tx-builder';
-import { address } from '@solana/kit';
-
-// With auto-blockhash fetch
-const message = await new TransactionBuilder({ rpc, version: 0 })
+const message = await new TransactionBuilder({ rpc })
   .setFeePayer(address('...'))
   .addInstruction(instruction)
   .build(); // Blockhash automatically fetched!
+```
 
-// With explicit blockhash
-const message = await new TransactionBuilder({ version: 0 })
+### Simulate Before Sending
+
+```typescript
+const result = await new TransactionBuilder({ rpc })
   .setFeePayer(address('...'))
-  .setBlockhashLifetime(blockhash, lastValidBlockHeight)
   .addInstruction(instruction)
-  .build(); // Type-safe: only compiles when all fields set
+  .simulate();
+
+if (result.err) {
+  console.error('Simulation failed:', result.logs);
+} else {
+  console.log('Compute units:', result.unitsConsumed);
+}
+```
+
+### Execute with Auto-Retry
+
+```typescript
+const signature = await new TransactionBuilder({ 
+  rpc,
+  autoRetry: { maxAttempts: 5, backoff: 'exponential' }
+})
+  .setFeePayer(address('...'))
+  .addInstruction(instruction)
+  .execute({ rpcSubscriptions });
+```
+
+## Exporting Transactions
+
+Sign and serialize transactions without sending. Useful for:
+- Custom transport or different RPC
+- Batch sending
+- Hardware wallets
+- QR codes for mobile wallets
+- Cross-platform transaction passing
+
+```typescript
+// Export for custom RPC (base64 is default)
+const { data: base64Tx } = await new TransactionBuilder({ rpc })
+  .setFeePayer(address('...'))
+  .addInstruction(instruction)
+  .export('base64');
+
+await customRpc.sendTransaction(base64Tx, { encoding: 'base64' });
+
+// Export for QR code (human-readable)
+const { data: base58Tx } = await builder.export('base58');
+displayQRCode(base58Tx);
+
+// Export raw bytes (hardware wallets)
+const { data: bytes } = await builder.export('bytes');
+await ledger.signTransaction(bytes);
+```
+
+### Export vs Other Methods
+
+| Method | Signs | Sends | Returns |
+|--------|-------|-------|---------|
+| `.build()` | No | No | `TransactionMessage` |
+| `.simulate()` | Yes* | No | `SimulationResult` |
+| `.export()` | Yes | No | `ExportedTransaction` |
+| `.execute()` | Yes | Yes | `string` (signature) |
+
+*Signs for simulation only
+
+## Compute Budget & Priority Fees
+
+Control transaction execution cost and priority:
+
+```typescript
+const builder = new TransactionBuilder({ 
+  rpc,
+  // Priority fee for faster execution
+  priorityLevel: 'high',      // Pays 50,000 micro-lamports per CU
+  
+  // Compute unit limit to prevent failures
+  computeUnitLimit: 300_000   // Allow up to 300k compute units
+});
+
+// These automatically prepend ComputeBudget instructions
+```
+
+### Priority Levels
+
+| Level | Micro-lamports per CU |
+|-------|----------------------|
+| `none` | 0 |
+| `low` | 1,000 |
+| `medium` | 10,000 (default) |
+| `high` | 50,000 |
+| `veryHigh` | 100,000 |
+
+### Optimizing Compute Budget
+
+```typescript
+// 1. Simulate to see actual compute usage
+const result = await builder.simulate();
+console.log('Actual units:', result.unitsConsumed);
+
+// 2. Create new builder with exact limit + buffer
+const optimized = new TransactionBuilder({ 
+  rpc,
+  computeUnitLimit: Number(result.unitsConsumed) + 10_000,
+  priorityLevel: 'medium'
+});
 ```
 
 ## Configuration
 
-### TransactionBuilderConfig
-
 ```typescript
 interface TransactionBuilderConfig {
+  // Transaction version (default: 0)
+  version?: 0 | 'legacy';
+  
+  // RPC for auto-blockhash fetch
+  rpc?: Rpc<GetLatestBlockhashApi>;
+  
   // Auto-retry configuration
   autoRetry?: boolean | { 
     maxAttempts: number; 
     backoff: 'linear' | 'exponential' 
   };
   
-  // Priority fees (coming soon)
+  // Priority fees
   priorityLevel?: 'none' | 'low' | 'medium' | 'high' | 'veryHigh';
   
-  // Compute budget (coming soon)
+  // Compute budget
   computeUnitLimit?: 'auto' | number;
   
   // Logging level
   logLevel?: 'silent' | 'minimal' | 'verbose';
-  
-  // Transaction version
-  version?: 'auto' | 0 | 'legacy';
-}
-```
-
-Example:
-
-```typescript
-const signature = await transaction({
-  autoRetry: { maxAttempts: 5, backoff: 'exponential' },
-  logLevel: 'verbose',
-  version: 0
-})
-  .addInstructions([instruction1, instruction2, instruction3])
-  .execute({ feePayer, rpc, rpcSubscriptions });
-```
-
-## Simulation
-
-Test transactions before sending:
-
-```typescript
-const result = await transaction()
-  .addInstruction(instruction)
-  .simulate({ feePayer: signer, rpc });
-
-if (result.err) {
-  console.error('Simulation failed!');
-  console.error('Logs:', result.logs);
-} else {
-  console.log('Success!');
-  console.log('Units consumed:', result.unitsConsumed);
-  if (result.returnData) {
-    console.log('Return data:', result.returnData);
-  }
 }
 ```
 
 ## Error Handling
 
-### Using Error Predicates
-
 ```typescript
 import { 
-  isNetworkError, 
   isBlockhashExpiredError,
   isSimulationFailedError,
   InsufficientFundsError
 } from '@pipeit/tx-builder';
 
 try {
-  const sig = await transaction()
-    .addInstruction(ix)
-    .execute({ feePayer, rpc, rpcSubscriptions });
+  const sig = await builder.execute({ rpcSubscriptions });
 } catch (error) {
-  if (isNetworkError(error)) {
-    console.error('Network issue, retry...');
-  } else if (isBlockhashExpiredError(error)) {
-    console.error('Blockhash expired, refetch...');
+  if (isBlockhashExpiredError(error)) {
+    console.error('Blockhash expired, retry with fresh blockhash');
+  } else if (isSimulationFailedError(error)) {
+    console.error('Simulation failed');
   } else if (error instanceof InsufficientFundsError) {
     console.error(`Need ${error.required} lamports, have ${error.available}`);
   }
 }
 ```
-
-### Available Error Types
-
-- `InsufficientFundsError`
-- `BlockhashExpiredError`
-- `SimulationFailedError`
-- `NetworkError`
-- `SignatureRejectedError`
-- `AccountNotFoundError`
-- `ProgramError`
-- `TransactionTooLargeError`
-- `InvalidTransactionError`
 
 ## Validation
 
@@ -172,45 +219,21 @@ validateTransaction(message);
 validateTransactionSize(message);
 ```
 
-## Utilities
-
-### Address Validation
-
-```typescript
-import { assertIsAddress, isValidAddress } from '@pipeit/tx-builder';
-
-// Type guard
-if (isValidAddress(maybeAddress)) {
-  // TypeScript knows it's an Address here
-}
-
-// Assertion (throws if invalid)
-assertIsAddress(address); // Uses Kit's assertion
-```
-
-### Lamports Helpers
-
-```typescript
-import { formatLamports, parseLamports } from '@pipeit/tx-builder';
-
-const sol = formatLamports(1_000_000_000n); // "1"
-const lamports = parseLamports("0.5"); // 500_000_000n
-```
-
 ## API Reference
 
 ### Main Exports
 
-- `transaction(config?)` - Create opinionated builder
-- `OpinionatedTransactionBuilder` - Class for opinionated builder
 - `TransactionBuilder` - Type-safe builder class
 - `TransactionBuilderConfig` - Configuration interface
 - `SimulationResult` - Simulation result interface
+- `ExportFormat` - Export format type ('base64' | 'base58' | 'bytes')
+- `ExportedTransaction` - Export result type
 
 ### Error Exports
 
 - All error classes and predicates
-- Error message utilities
+- `isBlockhashExpiredError(error)` - Check for expired blockhash
+- `isSimulationFailedError(error)` - Check for simulation failure
 
 ### Validation Exports
 
@@ -223,13 +246,8 @@ const lamports = parseLamports("0.5"); // 500_000_000n
 
 - `isValidAddress(value)`
 - `assertIsAddress(value)`
-- `isDefined(value)`
 - `formatLamports(lamports, decimals?)`
 - `parseLamports(sol, decimals?)`
-
-## Examples
-
-See the `examples/` directory for complete working examples.
 
 ## License
 

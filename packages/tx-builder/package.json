@@ -35,6 +35,7 @@
   "peerDependencies": {
     "@solana/kit": "^5.0.0",
     "@solana/addresses": "*",
+    "@solana/codecs-strings": "*",
     "@solana/errors": "*",
     "@solana/functional": "*",
     "@solana/instructions": "*",
@@ -77,6 +78,7 @@
   "dependencies": {},
   "devDependencies": {
     "@solana/kit": "^5.0.0",
+    "@solana/codecs-strings": "*",
     "@types/node": "^24",
     "tsup": "^8.5.0",
     "typescript": "^5.8.3",

@@ -14,6 +14,7 @@ export default defineConfig((options) => ({
   external: [
     '@solana/kit',
     '@solana/addresses',
+    '@solana/codecs-strings',
     '@solana/errors',
     '@solana/functional',
     '@solana/instructions',
