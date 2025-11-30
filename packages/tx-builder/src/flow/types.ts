@@ -9,6 +9,7 @@ import type { Instruction } from '@solana/instructions';
 import type {
   Rpc,
   GetLatestBlockhashApi,
+  GetAccountInfoApi,
   GetEpochInfoApi,
   GetSignatureStatusesApi,
   SendTransactionApi,
@@ -52,7 +53,7 @@ export interface FlowContext {
   /**
    * RPC client.
    */
-  rpc: Rpc<GetEpochInfoApi & GetSignatureStatusesApi & SendTransactionApi & GetLatestBlockhashApi>;
+  rpc: Rpc<GetAccountInfoApi & GetEpochInfoApi & GetSignatureStatusesApi & SendTransactionApi & GetLatestBlockhashApi>;
 
   /**
    * RPC subscriptions client.
@@ -141,7 +142,7 @@ export interface FlowConfig {
   /**
    * RPC client for transactions.
    */
-  rpc: Rpc<GetEpochInfoApi & GetSignatureStatusesApi & SendTransactionApi & GetLatestBlockhashApi>;
+  rpc: Rpc<GetAccountInfoApi & GetEpochInfoApi & GetSignatureStatusesApi & SendTransactionApi & GetLatestBlockhashApi>;
 
   /**
    * RPC subscriptions client for confirmations.
@@ -163,3 +164,4 @@ export interface FlowConfig {
    */
   commitment?: 'processed' | 'confirmed' | 'finalized';
 }
+

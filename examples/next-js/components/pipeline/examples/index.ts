@@ -3,6 +3,7 @@ export { useBatchedTransfersPipeline, batchedTransfersCode } from './batched-tra
 export { useMixedPipeline, mixedPipelineCode } from './mixed-pipeline';
 export { useJupiterKaminoPipeline, jupiterKaminoCode } from './jupiter-kamino';
 export { useRaydiumKaminoPipeline, raydiumKaminoCode } from './raydium-kamino';
+export { useInstructionPlanPipeline, instructionPlanCode } from './instruction-plan';
 
 
 

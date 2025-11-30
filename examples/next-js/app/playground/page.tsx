@@ -17,6 +17,8 @@ import {
   mixedPipelineCode,
   useRaydiumKaminoPipeline,
   raydiumKaminoCode,
+  useInstructionPlanPipeline,
+  instructionPlanCode,
 } from '@/components/pipeline/examples';
 import { ConnectButton } from '@/components/connector';
 import { PipelineHeaderButton } from '@/components/pipeline/pipeline-header-button';
@@ -51,13 +53,20 @@ const pipelineExamples: PipelineExampleConfig[] = [
     hook: useMixedPipeline,
     code: mixedPipelineCode,
   },
-  {
-    id: 'raydium-kamino',
-    name: 'Raydium + Kamino',
-    description: 'Raydium CLMM swap + Kamino deposit - pure IDL with auto account discovery',
-    hook: useRaydiumKaminoPipeline,
-    code: raydiumKaminoCode,
-  },
+  // {
+  //   id: 'raydium-kamino',
+  //   name: 'Raydium + Kamino',
+  //   description: 'Raydium CLMM swap + Kamino deposit - pure IDL with auto account discovery',
+  //   hook: useRaydiumKaminoPipeline,
+  //   code: raydiumKaminoCode,
+  // },
+  // {
+  //   id: 'instruction-plan',
+  //   name: 'Instruction Plan',
+  //   description: 'Kit instruction-plans with executePlan - static planning with automatic batching',
+  //   hook: useInstructionPlanPipeline,
+  //   code: instructionPlanCode,
+  // },
 ];
 
 function PipelineExampleCard({ example }: { example: PipelineExampleConfig }) {

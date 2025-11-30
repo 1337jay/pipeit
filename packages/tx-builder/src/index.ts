@@ -3,6 +3,15 @@
  *
  * Type-safe transaction builder for Solana with smart defaults.
  *
+ * Features:
+ * - Type-safe builder with compile-time validation
+ * - Auto-blockhash fetching and durable nonce support
+ * - Priority fee estimation and compute budget management
+ * - Address lookup table compression
+ * - Advanced sending strategies (skipPreflight, maxRetries)
+ * - Multi-step transaction orchestration (Flow API)
+ * - Kit instruction-plans integration
+ *
  * @packageDocumentation
  */
 
@@ -34,7 +43,14 @@ export * from './plans/index.js';
 export type { Base64EncodedWireTransaction } from '@solana/transactions';
 
 // Type-safety types
-export type { BuilderState, RequiredState, BuilderConfig, LifetimeConstraint } from './types.js';
+export type { 
+  BuilderState, 
+  RequiredState, 
+  BuilderConfig, 
+  LifetimeConstraint,
+  SendingConfig,
+  ExecuteConfig,
+} from './types.js';
 
 // Errors
 export * from './errors/index.js';
@@ -53,3 +69,16 @@ export * from './signers/index.js';
 
 // Packing - message packing utilities
 export * from './packing/index.js';
+
+// Compute Budget - priority fees and compute units
+export * from './compute-budget/index.js';
+
+// Confirmation - transaction confirmation strategies
+export * from './confirmation/index.js';
+
+// Nonce - durable nonce utilities
+export * from './nonce/index.js';
+
+// Lookup Tables - address lookup table utilities
+export * from './lookup-tables/index.js';
+

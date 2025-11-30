@@ -41,13 +41,14 @@
  * @packageDocumentation
  */
 
-import { address, type Address } from '@solana/addresses';
+import type { Address } from '@solana/addresses';
 import type { Instruction } from '@solana/instructions';
 import type { TransactionMessage } from '@solana/transaction-messages';
 import type { Blockhash } from '@solana/rpc-types';
 import type {
   Rpc,
   GetLatestBlockhashApi,
+  GetAccountInfoApi,
   GetEpochInfoApi,
   GetSignatureStatusesApi,
   SendTransactionApi,
@@ -77,9 +78,26 @@ import {
 } from '@solana/transactions';
 import { getBase58Decoder } from '@solana/codecs-strings';
 import { SolanaError, SOLANA_ERROR__TRANSACTION__FEE_PAYER_MISSING } from '@solana/errors';
-import type { BuilderState, RequiredState, LifetimeConstraint } from '../types.js';
+import type { BuilderState, RequiredState, LifetimeConstraint, ExecuteConfig } from '../types.js';
 import { validateTransaction, validateTransactionSize } from '../validation/index.js';
 import { packInstructions } from '../packing/index.js';
+
+// Import new modules
+import {
+  type PriorityFeeConfig,
+  type ComputeUnitConfig,
+  createSetComputeUnitPriceInstruction,
+  createSetComputeUnitLimitInstruction,
+  estimatePriorityFee,
+  PRIORITY_FEE_LEVELS,
+  type PriorityFeeLevel,
+} from '../compute-budget/index.js';
+import { fetchNonceValue, type DurableNonceConfig } from '../nonce/index.js';
+import {
+  type AddressesByLookupTableAddress,
+  fetchAddressLookupTables,
+  compressTransactionMessage,
+} from '../lookup-tables/index.js';
 
 // ============================================================================
 // Export Types
@@ -101,63 +119,7 @@ export type ExportedTransaction =
   | { format: 'base58'; data: string }
   | { format: 'bytes'; data: Uint8Array };
 
-// ============================================================================
-// Compute Budget Constants
-// ============================================================================
-
-/**
- * Compute Budget program address.
- */
-const COMPUTE_BUDGET_PROGRAM = address('ComputeBudget111111111111111111111111111111');
-
-/**
- * Priority fee levels in micro-lamports per compute unit.
- */
-const PRIORITY_FEE_LEVELS: Record<'none' | 'low' | 'medium' | 'high' | 'veryHigh', number> = {
-  none: 0,
-  low: 1_000,        // 0.001 SOL per CU
-  medium: 10_000,    // 0.01 SOL per CU
-  high: 50_000,      // 0.05 SOL per CU
-  veryHigh: 100_000, // 0.1 SOL per CU
-};
-
-// ============================================================================
-// Compute Budget Helpers
-// ============================================================================
-
-/**
- * Create SetComputeUnitLimit instruction.
- * Sets the maximum compute units a transaction can consume.
- */
-function createSetComputeUnitLimitInstruction(units: number): Instruction {
-  // Instruction data: [2, units as u32 LE]
-  const data = new Uint8Array(5);
-  data[0] = 2; // SetComputeUnitLimit discriminator
-  new DataView(data.buffer).setUint32(1, units, true);
-  
-  return {
-    programAddress: COMPUTE_BUDGET_PROGRAM,
-    accounts: [],
-    data,
-  };
-}
-
-/**
- * Create SetComputeUnitPrice instruction.
- * Sets the priority fee in micro-lamports per compute unit.
- */
-function createSetComputeUnitPriceInstruction(microLamports: number): Instruction {
-  // Instruction data: [3, microLamports as u64 LE]
-  const data = new Uint8Array(9);
-  data[0] = 3; // SetComputeUnitPrice discriminator
-  new DataView(data.buffer).setBigUint64(1, BigInt(microLamports), true);
-  
-  return {
-    programAddress: COMPUTE_BUDGET_PROGRAM,
-    accounts: [],
-    data,
-  };
-}
+// Note: Compute budget constants and helpers are now imported from ../compute-budget/index.js
 
 /**
  * Configuration for transaction builder.
@@ -171,7 +133,7 @@ export interface TransactionBuilderConfig {
   /**
    * RPC client for auto-fetching blockhash when not explicitly provided.
    */
-  rpc?: Rpc<GetLatestBlockhashApi>;
+  rpc?: Rpc<GetLatestBlockhashApi & GetAccountInfoApi>;
   
   /**
    * Auto-retry failed transactions.
@@ -187,16 +149,31 @@ export interface TransactionBuilderConfig {
   logLevel?: 'silent' | 'minimal' | 'verbose';
   
   /**
-   * Priority fee level for transactions (coming soon).
+   * Priority fee configuration.
+   * - PriorityFeeLevel string: Use preset level ('none', 'low', 'medium', 'high', 'veryHigh')
+   * - PriorityFeeConfig object: Use custom configuration with strategy
    */
-  priorityLevel?: 'none' | 'low' | 'medium' | 'high' | 'veryHigh';
+  priorityFee?: PriorityFeeLevel | PriorityFeeConfig;
   
   /**
-   * Compute unit limit (coming soon).
-   * - `'auto'`: Use default (200,000)
-   * - `number`: Specific limit
+   * Compute unit configuration.
+   * - 'auto': Use default (200,000 CU, no explicit instruction)
+   * - number: Use fixed compute unit limit
+   * - ComputeUnitConfig object: Use custom configuration with strategy
    */
-  computeUnitLimit?: 'auto' | number;
+  computeUnits?: 'auto' | number | ComputeUnitConfig;
+  
+  /**
+   * Address lookup table addresses to fetch and use for compression.
+   * Only works with version 0 transactions.
+   */
+  lookupTableAddresses?: Address[];
+  
+  /**
+   * Pre-fetched lookup table data.
+   * Use this to avoid fetching if you already have the data.
+   */
+  addressesByLookupTable?: AddressesByLookupTableAddress;
 }
 
 /**
@@ -231,11 +208,13 @@ export class TransactionBuilder<TState extends BuilderState = BuilderState> {
   
   private config: {
     version: 0 | 'legacy';
-    rpc: Rpc<GetLatestBlockhashApi> | undefined;
+    rpc: Rpc<GetLatestBlockhashApi & GetAccountInfoApi> | undefined;
     autoRetry: boolean | { maxAttempts: number; backoff: 'linear' | 'exponential' };
     logLevel: 'silent' | 'minimal' | 'verbose';
-    priorityLevel: 'none' | 'low' | 'medium' | 'high' | 'veryHigh';
-    computeUnitLimit: 'auto' | number;
+    priorityFee: PriorityFeeLevel | PriorityFeeConfig;
+    computeUnits: 'auto' | number | ComputeUnitConfig;
+    lookupTableAddresses?: Address[];
+    addressesByLookupTable?: AddressesByLookupTableAddress;
   };
 
   constructor(config: TransactionBuilderConfig = {}) {
@@ -244,9 +223,52 @@ export class TransactionBuilder<TState extends BuilderState = BuilderState> {
       rpc: config.rpc,
       autoRetry: config.autoRetry ?? { maxAttempts: 3, backoff: 'exponential' },
       logLevel: config.logLevel ?? 'minimal',
-      priorityLevel: config.priorityLevel ?? 'medium',
-      computeUnitLimit: config.computeUnitLimit ?? 'auto',
+      priorityFee: config.priorityFee ?? 'medium',
+      computeUnits: config.computeUnits ?? 'auto',
+      ...(config.lookupTableAddresses && { lookupTableAddresses: config.lookupTableAddresses }),
+      ...(config.addressesByLookupTable && { addressesByLookupTable: config.addressesByLookupTable }),
     };
+  }
+
+  /**
+   * Create a TransactionBuilder configured for durable nonce transactions.
+   * Automatically fetches the current nonce value from the account.
+   *
+   * @param config - Durable nonce configuration
+   * @returns TransactionBuilder with nonce lifetime already set
+   *
+   * @example
+   * ```ts
+   * const builder = await TransactionBuilder.withDurableNonce({
+   *   rpc,
+   *   nonceAccountAddress: address('...'),
+   *   nonceAuthorityAddress: address('...'),
+   * });
+   * 
+   * await builder
+   *   .setFeePayer(feePayer)
+   *   .addInstruction(ix)
+   *   .execute({ rpcSubscriptions });
+   * ```
+   */
+  static async withDurableNonce(
+    config: DurableNonceConfig & { rpc: Rpc<GetLatestBlockhashApi & GetAccountInfoApi> } & Omit<TransactionBuilderConfig, 'rpc'>
+  ): Promise<TransactionBuilder<{ lifetime: true }>> {
+    const { nonceAccountAddress, nonceAuthorityAddress, nonce: providedNonce, rpc, ...builderConfig } = config;
+    
+    // Fetch nonce if not provided
+    const nonce = providedNonce ?? await fetchNonceValue(rpc, nonceAccountAddress);
+    
+    // Create builder with nonce lifetime already set
+    const builder = new TransactionBuilder({ rpc, ...builderConfig });
+    builder.lifetime = {
+      type: 'nonce',
+      nonce,
+      nonceAccountAddress,
+      nonceAuthorityAddress,
+    };
+    
+    return builder as TransactionBuilder<{ lifetime: true }>;
   }
 
   /**
@@ -322,6 +344,7 @@ export class TransactionBuilder<TState extends BuilderState = BuilderState> {
    * 
    * If RPC was provided in constructor and lifetime not set, automatically fetches latest blockhash.
    * Automatically prepends compute budget instructions if configured.
+   * Applies address lookup table compression if configured (version 0 only).
    */
   async build(
     this: TransactionBuilder<RequiredState>
@@ -343,6 +366,15 @@ export class TransactionBuilder<TState extends BuilderState = BuilderState> {
     if (!this.lifetime) {
       throw new Error(
         'Lifetime required. Provide blockhash via setBlockhashLifetime() or pass rpc to constructor for auto-fetch.'
+      );
+    }
+
+    // Fetch lookup tables if addresses provided but data not
+    let lookupTableData = this.config.addressesByLookupTable;
+    if (!lookupTableData && this.config.lookupTableAddresses?.length && this.config.rpc) {
+      lookupTableData = await fetchAddressLookupTables(
+        this.config.rpc,
+        this.config.lookupTableAddresses
       );
     }
 
@@ -371,18 +403,20 @@ export class TransactionBuilder<TState extends BuilderState = BuilderState> {
     // ADD COMPUTE BUDGET INSTRUCTIONS FIRST (if configured)
     // Order matters: limit first, then price
     
-    // 1. Compute unit limit (if not 'auto')
-    if (this.config.computeUnitLimit !== 'auto') {
+    // 1. Compute unit limit
+    const computeUnits = await this.resolveComputeUnits();
+    if (computeUnits !== null) {
       message = appendTransactionMessageInstruction(
-        createSetComputeUnitLimitInstruction(this.config.computeUnitLimit),
+        createSetComputeUnitLimitInstruction(computeUnits),
         message
       );
     }
     
-    // 2. Priority fee / compute unit price (if not 'none')
-    if (this.config.priorityLevel !== 'none') {
+    // 2. Priority fee / compute unit price
+    const priorityFee = await this.resolvePriorityFee();
+    if (priorityFee > 0) {
       message = appendTransactionMessageInstruction(
-        createSetComputeUnitPriceInstruction(PRIORITY_FEE_LEVELS[this.config.priorityLevel]),
+        createSetComputeUnitPriceInstruction(priorityFee),
         message
       );
     }
@@ -392,11 +426,86 @@ export class TransactionBuilder<TState extends BuilderState = BuilderState> {
       message = appendTransactionMessageInstruction(instruction, message);
     }
 
+    // Apply address lookup table compression (version 0 only)
+    if (lookupTableData && this.config.version === 0) {
+      message = compressTransactionMessage(message, lookupTableData);
+    }
+
     // Auto-validate before returning
     validateTransaction(message);
     validateTransactionSize(message);
 
     return message;
+  }
+
+  /**
+   * Resolve priority fee based on configuration.
+   */
+  private async resolvePriorityFee(): Promise<number> {
+    const { priorityFee } = this.config;
+    
+    // String level (preset)
+    if (typeof priorityFee === 'string') {
+      return PRIORITY_FEE_LEVELS[priorityFee] ?? 0;
+    }
+    
+    // Config object
+    if (priorityFee.strategy === 'none') {
+      return 0;
+    }
+    
+    if (priorityFee.strategy === 'fixed') {
+      return priorityFee.microLamports ?? 0;
+    }
+    
+    // Percentile strategy - requires RPC
+    if (priorityFee.strategy === 'percentile' && this.config.rpc) {
+      const estimate = await estimatePriorityFee(
+        this.config.rpc as any,
+        priorityFee
+      );
+      return estimate.microLamports;
+    }
+    
+    // Fallback to medium
+    return PRIORITY_FEE_LEVELS.medium;
+  }
+
+  /**
+   * Resolve compute units based on configuration.
+   * Returns null if no compute unit instruction should be added.
+   */
+  private async resolveComputeUnits(): Promise<number | null> {
+    const { computeUnits } = this.config;
+    
+    // 'auto' = no explicit instruction
+    if (computeUnits === 'auto') {
+      return null;
+    }
+    
+    // Fixed number
+    if (typeof computeUnits === 'number') {
+      return computeUnits;
+    }
+    
+    // Config object
+    if (computeUnits.strategy === 'auto') {
+      return null;
+    }
+    
+    if (computeUnits.strategy === 'fixed') {
+      return computeUnits.units ?? 200_000;
+    }
+    
+    // Simulate strategy - would need simulation first
+    // For now, return a sensible default
+    if (computeUnits.strategy === 'simulate') {
+      // Simulation-based compute unit estimation would be done during execute()
+      // For build(), return a safe default
+      return computeUnits.units ?? 200_000;
+    }
+    
+    return null;
   }
 
   /**
@@ -418,40 +527,14 @@ export class TransactionBuilder<TState extends BuilderState = BuilderState> {
       throw new Error('RPC required for simulation. Pass rpc in constructor.');
     }
     
-    // Build message with auto-blockhash
-    const { value: latestBlockhash } = await this.config.rpc.getLatestBlockhash().send();
-    
-    let message: any = pipe(
-      createTransactionMessage({ version: this.config.version }),
-      (tx) => setTransactionMessageFeePayer(this.feePayer!, tx),
-      (tx) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, tx)
-    );
-    
-    // Add compute budget instructions first (if configured)
-    if (this.config.computeUnitLimit !== 'auto') {
-      message = appendTransactionMessageInstruction(
-        createSetComputeUnitLimitInstruction(this.config.computeUnitLimit),
-        message
-      );
-    }
-    
-    if (this.config.priorityLevel !== 'none') {
-      message = appendTransactionMessageInstruction(
-        createSetComputeUnitPriceInstruction(PRIORITY_FEE_LEVELS[this.config.priorityLevel]),
-        message
-      );
-    }
-    
-    // Add user instructions
-    for (const instruction of this.instructions) {
-      message = appendTransactionMessageInstruction(instruction, message);
-    }
+    // Build message using the unified build method
+    const message = await (this as any).build();
     
     // Sign for simulation
     const signedTransaction: any = await signTransactionMessageWithSigners(message);
     
     // Simulate using Kit's API
-    const rpcWithSim = this.config.rpc as Rpc<GetLatestBlockhashApi & SimulateTransactionApi>;
+    const rpcWithSim = this.config.rpc as unknown as Rpc<SimulateTransactionApi>;
     const result = await rpcWithSim.simulateTransaction(signedTransaction, { 
       commitment,
       replaceRecentBlockhash: true,
@@ -502,34 +585,8 @@ export class TransactionBuilder<TState extends BuilderState = BuilderState> {
       throw new Error('RPC required for export. Pass rpc in constructor.');
     }
     
-    // Build message with auto-blockhash
-    const { value: latestBlockhash } = await this.config.rpc.getLatestBlockhash().send();
-    
-    let message: any = pipe(
-      createTransactionMessage({ version: this.config.version }),
-      (tx) => setTransactionMessageFeePayer(this.feePayer!, tx),
-      (tx) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, tx)
-    );
-    
-    // Add compute budget instructions first (if configured)
-    if (this.config.computeUnitLimit !== 'auto') {
-      message = appendTransactionMessageInstruction(
-        createSetComputeUnitLimitInstruction(this.config.computeUnitLimit),
-        message
-      );
-    }
-    
-    if (this.config.priorityLevel !== 'none') {
-      message = appendTransactionMessageInstruction(
-        createSetComputeUnitPriceInstruction(PRIORITY_FEE_LEVELS[this.config.priorityLevel]),
-        message
-      );
-    }
-    
-    // Add user instructions
-    for (const instruction of this.instructions) {
-      message = appendTransactionMessageInstruction(instruction, message);
-    }
+    // Build message using the unified build method
+    const message = await (this as any).build();
     
     // Sign transaction
     const signedTransaction: any = await signTransactionMessageWithSigners(message);
@@ -558,13 +615,36 @@ export class TransactionBuilder<TState extends BuilderState = BuilderState> {
   /**
    * Execute the transaction with smart defaults.
    * 
+   * Supports advanced sending options like skipPreflight and maxRetries.
+   * 
    * Note: Requires feePayer to be set and RPC in config.
+   *
+   * @example
+   * ```ts
+   * // Basic execution
+   * const sig = await builder.execute({ rpcSubscriptions });
+   *
+   * // With sending options
+   * const sig = await builder.execute({
+   *   rpcSubscriptions,
+   *   skipPreflight: false,
+   *   skipPreflightOnRetry: true,
+   *   maxRetries: 5,
+   *   preflightCommitment: 'confirmed',
+   * });
+   * ```
    */
   async execute(params: {
     rpcSubscriptions: RpcSubscriptions<SignatureNotificationsApi & SlotNotificationsApi>;
-    commitment?: 'processed' | 'confirmed' | 'finalized';
-  }): Promise<string> {
-    const { rpcSubscriptions, commitment = 'confirmed' } = params;
+  } & ExecuteConfig): Promise<string> {
+    const { 
+      rpcSubscriptions, 
+      commitment = 'confirmed',
+      skipPreflight = false,
+      skipPreflightOnRetry = true,
+      preflightCommitment = 'confirmed',
+      maxRetries,
+    } = params;
     
     if (!this.feePayer) {
       throw new SolanaError(SOLANA_ERROR__TRANSACTION__FEE_PAYER_MISSING);
@@ -574,41 +654,10 @@ export class TransactionBuilder<TState extends BuilderState = BuilderState> {
       throw new Error('RPC required for execute. Pass rpc in constructor.');
     }
     
-    const rpc = this.config.rpc as Rpc<GetEpochInfoApi & GetSignatureStatusesApi & SendTransactionApi & GetLatestBlockhashApi>;
+    const rpc = this.config.rpc as unknown as Rpc<GetEpochInfoApi & GetSignatureStatusesApi & SendTransactionApi & GetLatestBlockhashApi>;
     
-    // Fetch latest blockhash
-    const { value: latestBlockhash } = await rpc.getLatestBlockhash().send();
-    
-    // Build transaction message using Kit's functional API
-    let message: any = pipe(
-      createTransactionMessage({ version: this.config.version }),
-      (tx) => setTransactionMessageFeePayer(this.feePayer!, tx),
-      (tx) => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, tx)
-    );
-    
-    // Add compute budget instructions first (if configured)
-    if (this.config.computeUnitLimit !== 'auto') {
-      message = appendTransactionMessageInstruction(
-        createSetComputeUnitLimitInstruction(this.config.computeUnitLimit),
-        message
-      );
-    }
-    
-    if (this.config.priorityLevel !== 'none') {
-      message = appendTransactionMessageInstruction(
-        createSetComputeUnitPriceInstruction(PRIORITY_FEE_LEVELS[this.config.priorityLevel]),
-        message
-      );
-    }
-    
-    // Add user instructions
-    for (const instruction of this.instructions) {
-      message = appendTransactionMessageInstruction(instruction, message);
-    }
-    
-    // Validate before sending
-    validateTransaction(message);
-    validateTransactionSize(message);
+    // Build message using the unified build method
+    const message = await (this as any).build();
     
     // Sign transaction
     const signedTransaction: any = await signTransactionMessageWithSigners(message);
@@ -621,10 +670,21 @@ export class TransactionBuilder<TState extends BuilderState = BuilderState> {
     
     // Add retry logic if enabled
     if (this.config.autoRetry) {
-      return this.executeWithRetry(sendAndConfirm, signedTransaction, commitment);
+      return this.executeWithRetry(sendAndConfirm, signedTransaction, commitment, {
+        skipPreflightOnRetry,
+        preflightCommitment,
+      });
     }
     
-    await sendAndConfirm(signedTransaction, { commitment });
+    // Prepare send options (avoid undefined for exactOptionalPropertyTypes)
+    const sendOptions: Parameters<typeof sendAndConfirm>[1] = {
+      commitment,
+      ...(skipPreflight && { skipPreflight }),
+      ...(!skipPreflight && { preflightCommitment }),
+      ...(maxRetries !== undefined && { maxRetries: BigInt(maxRetries) }),
+    };
+    
+    await sendAndConfirm(signedTransaction, sendOptions);
     return getSignatureFromTransaction(signedTransaction);
   }
 
@@ -717,7 +777,11 @@ export class TransactionBuilder<TState extends BuilderState = BuilderState> {
   private async executeWithRetry(
     sendAndConfirm: ReturnType<typeof sendAndConfirmTransactionFactory>,
     transaction: any,
-    commitment: 'processed' | 'confirmed' | 'finalized'
+    commitment: 'processed' | 'confirmed' | 'finalized',
+    options?: {
+      skipPreflightOnRetry?: boolean;
+      preflightCommitment?: 'processed' | 'confirmed' | 'finalized';
+    }
   ): Promise<string> {
     const retryConfig = this.config.autoRetry === true 
       ? { maxAttempts: 3, backoff: 'exponential' as const }
@@ -728,6 +792,7 @@ export class TransactionBuilder<TState extends BuilderState = BuilderState> {
     }
     
     const { maxAttempts, backoff } = retryConfig;
+    const { skipPreflightOnRetry = true, preflightCommitment = 'confirmed' } = options ?? {};
     
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
@@ -735,7 +800,15 @@ export class TransactionBuilder<TState extends BuilderState = BuilderState> {
           console.log(`[Pipeit] Transaction attempt ${attempt}/${maxAttempts}`);
         }
         
-        await sendAndConfirm(transaction, { commitment });
+        // Skip preflight on retry attempts if enabled
+        const shouldSkipPreflight = attempt > 1 && skipPreflightOnRetry;
+        const sendOptions: Parameters<typeof sendAndConfirm>[1] = {
+          commitment,
+          ...(shouldSkipPreflight && { skipPreflight: true }),
+          ...(!shouldSkipPreflight && { preflightCommitment }),
+        };
+        
+        await sendAndConfirm(transaction, sendOptions);
         return getSignatureFromTransaction(transaction);
       } catch (error) {
         if (attempt === maxAttempts) {
@@ -795,8 +868,10 @@ export class TransactionBuilder<TState extends BuilderState = BuilderState> {
       ...(this.config.rpc && { rpc: this.config.rpc }),
       autoRetry: this.config.autoRetry,
       logLevel: this.config.logLevel,
-      priorityLevel: this.config.priorityLevel,
-      computeUnitLimit: this.config.computeUnitLimit,
+      priorityFee: this.config.priorityFee,
+      computeUnits: this.config.computeUnits,
+      ...(this.config.lookupTableAddresses && { lookupTableAddresses: this.config.lookupTableAddresses }),
+      ...(this.config.addressesByLookupTable && { addressesByLookupTable: this.config.addressesByLookupTable }),
     });
     if (this.feePayer !== undefined) {
       builder.feePayer = this.feePayer;
