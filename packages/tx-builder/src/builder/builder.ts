@@ -71,12 +71,15 @@ import { sendAndConfirmTransactionFactory, getSignatureFromTransaction } from '@
 import { 
   getBase64EncodedWireTransaction,
   getTransactionEncoder,
+  getTransactionMessageSize,
+  TRANSACTION_SIZE_LIMIT,
   type Base64EncodedWireTransaction,
 } from '@solana/transactions';
 import { getBase58Decoder } from '@solana/codecs-strings';
 import { SolanaError, SOLANA_ERROR__TRANSACTION__FEE_PAYER_MISSING } from '@solana/errors';
 import type { BuilderState, RequiredState, LifetimeConstraint } from '../types.js';
 import { validateTransaction, validateTransactionSize } from '../validation/index.js';
+import { packInstructions } from '../packing/index.js';
 
 // ============================================================================
 // Export Types
@@ -623,6 +626,89 @@ export class TransactionBuilder<TState extends BuilderState = BuilderState> {
     
     await sendAndConfirm(signedTransaction, { commitment });
     return getSignatureFromTransaction(signedTransaction);
+  }
+
+  /**
+   * Get current transaction size information.
+   * Useful before calling build() to check if more instructions can fit.
+   *
+   * Note: This builds the message to calculate accurate size.
+   * Requires feePayer to be set and RPC in config for auto-blockhash.
+   *
+   * @example
+   * ```ts
+   * const info = await builder.getSizeInfo();
+   * console.log(`Using ${info.percentUsed.toFixed(1)}% of transaction space`);
+   * console.log(`${info.remaining} bytes remaining`);
+   * ```
+   */
+  async getSizeInfo(): Promise<{
+    size: number;
+    limit: number;
+    remaining: number;
+    percentUsed: number;
+    canFitMore: boolean;
+  }> {
+    // Build message to get accurate size
+    const message = await (this as any).build();
+    const size = getTransactionMessageSize(message);
+    return {
+      size,
+      limit: TRANSACTION_SIZE_LIMIT,
+      remaining: TRANSACTION_SIZE_LIMIT - size,
+      percentUsed: (size / TRANSACTION_SIZE_LIMIT) * 100,
+      canFitMore: size < TRANSACTION_SIZE_LIMIT,
+    };
+  }
+
+  /**
+   * Add instructions with auto-packing. Returns overflow instructions that did not fit.
+   * Useful for batching large instruction sets across multiple transactions.
+   *
+   * @param instructions - Array of instructions to add
+   * @returns Object with the new builder (with packed instructions) and overflow array
+   *
+   * @example
+   * ```ts
+   * const { builder: packed, overflow } = await baseBuilder
+   *   .addInstructionsWithPacking(manyInstructions);
+   *
+   * // Execute the first batch
+   * await packed.execute({ rpcSubscriptions });
+   *
+   * // Handle overflow in another transaction
+   * if (overflow.length > 0) {
+   *   const { builder: packed2 } = await baseBuilder
+   *     .addInstructionsWithPacking(overflow);
+   *   await packed2.execute({ rpcSubscriptions });
+   * }
+   * ```
+   */
+  async addInstructionsWithPacking(
+    instructions: readonly Instruction[]
+  ): Promise<{ builder: TransactionBuilder<TState>; overflow: Instruction[] }> {
+    if (!this.feePayer) {
+      throw new SolanaError(SOLANA_ERROR__TRANSACTION__FEE_PAYER_MISSING);
+    }
+    
+    if (!this.config.rpc) {
+      throw new Error('RPC required for packing. Pass rpc in constructor.');
+    }
+    
+    // Build a base message to calculate sizes against
+    const baseMessage = await (this as any).build();
+    
+    // Pack instructions
+    const result = packInstructions(baseMessage, [...instructions]);
+    
+    // Create a new builder with the packed instructions
+    const builder = this.clone();
+    builder.instructions = [...this.instructions, ...result.packed];
+    
+    return {
+      builder,
+      overflow: result.overflow,
+    };
   }
 
   /**

@@ -6,7 +6,7 @@ IDL-based transaction builder for Solana programs. Automatically fetch program I
 
 - **Automatic IDL Fetching**: Fetch IDLs from on-chain accounts or external registries
 - **Zero Custom Code**: Works with any Solana program that has an IDL (Anchor or Codama)
-- **Package Agnostic**: Generates standard `Instruction` objects compatible with `@pipeit/tx-core`, `@pipeit/tx-builder`, and `@pipeit/tx-orchestration`
+- **Package Agnostic**: Generates standard `Instruction` objects compatible with `@pipeit/tx-builder` and `@solana/kit`
 - **Full Type Support**: Handles primitives, structs, enums, arrays, options, and complex nested types
 - **Account Resolution**: Automatically resolves accounts, handles PDAs, and validates account requirements
 - **Automatic Account Discovery**: Auto-resolves well-known programs, user token accounts (ATAs), and protocol-specific accounts via plugins
@@ -72,17 +72,17 @@ const builder = new TransactionBuilder()
   .setBlockhashLifetime(blockhash, lastValidBlockHeight);
 ```
 
-### With tx-orchestration
+### With Multi-Step Flows
 
 ```typescript
-import { createPipeline } from '@pipeit/tx-orchestration';
+import { createFlow } from '@pipeit/tx-builder';
 import { IdlProgramRegistry } from '@pipeit/tx-idl';
 
 const registry = new IdlProgramRegistry();
 await registry.registerProgram(programId, rpc);
 
-const pipeline = createPipeline()
-  .instruction('step1', async (ctx) => {
+const result = await createFlow({ rpc, rpcSubscriptions, signer })
+  .step('step1', async (ctx) => {
     return registry.buildInstruction(
       programId,
       'createAccount',
@@ -91,18 +91,17 @@ const pipeline = createPipeline()
       { signer: ctx.signer.address, programId, rpc: ctx.rpc }
     );
   })
-  .instruction('step2', async (ctx) => {
-    const step1Result = ctx.results.get('step1');
+  .step('step2', async (ctx) => {
+    const step1Result = ctx.get('step1');
     return registry.buildInstruction(
       programId,
       'initialize',
       { data: 'hello' },
-      { account: step1Result.account },
+      { account: step1Result?.account },
       { signer: ctx.signer.address, programId, rpc: ctx.rpc }
     );
-  });
-
-await pipeline.execute({ signer, rpc, rpcSubscriptions });
+  })
+  .execute();
 ```
 
 ### Loading IDL from JSON

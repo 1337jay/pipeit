@@ -4,14 +4,24 @@
  * @packageDocumentation
  */
 
-import type { TransactionMessage } from '@solana/transaction-messages';
+import type { TransactionMessage, TransactionMessageWithFeePayer } from '@solana/transaction-messages';
 import { SolanaError, SOLANA_ERROR__TRANSACTION__FEE_PAYER_MISSING } from '@solana/errors';
+import { getTransactionMessageSize, TRANSACTION_SIZE_LIMIT } from '@solana/transactions';
 import { TransactionTooLargeError } from '../errors/index.js';
 
 /**
- * Maximum transaction size in bytes.
+ * A transaction message that is ready for size calculation.
+ * Must have a fee payer set.
  */
-export const MAX_TRANSACTION_SIZE = 1232;
+type SizeableMessage = TransactionMessage & TransactionMessageWithFeePayer;
+
+// Re-export Kit's size constants and functions
+export { TRANSACTION_SIZE_LIMIT, getTransactionMessageSize };
+
+/**
+ * @deprecated Use TRANSACTION_SIZE_LIMIT from @solana/transactions instead
+ */
+export const MAX_TRANSACTION_SIZE = TRANSACTION_SIZE_LIMIT;
 
 /**
  * Validate that a transaction message has all required fields.
@@ -29,47 +39,37 @@ export function validateTransaction(message: TransactionMessage): void {
 }
 
 /**
- * Estimate transaction size in bytes.
- * This is a rough estimate and may not be exact.
+ * @deprecated Use getTransactionMessageSize from @solana/transactions instead
  */
-export function estimateTransactionSize(message: TransactionMessage): number {
-  // Base overhead for transaction structure
-  let size = 100;
-
-  // Add size for each instruction
-  if ('instructions' in message && message.instructions) {
-    for (const instruction of message.instructions) {
-      size += 100; // Base instruction overhead
-      if ('data' in instruction && instruction.data) {
-        size += instruction.data.length;
-      }
-      if ('accounts' in instruction && instruction.accounts) {
-        size += instruction.accounts.length * 32; // Account address size
-      }
-    }
-  }
-
-  // Add size for address lookup tables if present
-  if ('version' in message && message.version === 0) {
-    // V0 transactions can have address lookup tables
-    size += 50; // Rough estimate
-  }
-
-  return size;
+export function estimateTransactionSize(message: SizeableMessage): number {
+  return getTransactionMessageSize(message);
 }
 
 /**
  * Validate transaction size does not exceed maximum.
  */
-export function validateTransactionSize(message: TransactionMessage): void {
-  const size = estimateTransactionSize(message);
-  if (size > MAX_TRANSACTION_SIZE) {
-    throw new TransactionTooLargeError(size, MAX_TRANSACTION_SIZE);
+export function validateTransactionSize(message: SizeableMessage): void {
+  const size = getTransactionMessageSize(message);
+  if (size > TRANSACTION_SIZE_LIMIT) {
+    throw new TransactionTooLargeError(size, TRANSACTION_SIZE_LIMIT);
   }
 }
 
-
-
-
-
-
+/**
+ * Get detailed transaction size information.
+ * Useful for checking how much space is remaining before adding more instructions.
+ */
+export function getTransactionSizeInfo(message: SizeableMessage): {
+  size: number;
+  limit: number;
+  remaining: number;
+  percentUsed: number;
+} {
+  const size = getTransactionMessageSize(message);
+  return {
+    size,
+    limit: TRANSACTION_SIZE_LIMIT,
+    remaining: TRANSACTION_SIZE_LIMIT - size,
+    percentUsed: (size / TRANSACTION_SIZE_LIMIT) * 100,
+  };
+}

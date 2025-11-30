@@ -11,3 +11,9 @@ export * from './messages.js';
 
 // Kit errors (re-exported for convenience)
 export * from './kit-errors.js';
+
+// Program error identification
+export * from './programs.js';
+
+// Error diagnostics - detailed human-readable error info
+export * from './diagnostics.js';

@@ -4,9 +4,8 @@ A comprehensive Solana transaction building library that reduces boilerplate and
 
 ## Packages
 
-- **@pipeit/tx-builder** - Main transaction builder with smart defaults
+- **@pipeit/tx-builder** - Main transaction builder with smart defaults, multi-step flows, and Kit instruction-plans integration
 - **@pipeit/tx-idl** - IDL-based transaction building with automatic account discovery
-- **@pipeit/tx-orchestration** - (EXPERIMENTAL) Advanced multi-step orchestration
 
 ## Installation
 
@@ -16,46 +15,67 @@ pnpm install @pipeit/tx-builder @solana/kit
 
 # IDL-based building
 pnpm install @pipeit/tx-idl @solana/kit
-
-# Experimental orchestration
-pnpm install @pipeit/tx-orchestration @solana/kit
 ```
 
 ## Quick Start
 
-### Simple API
+### Single Transaction
 
 ```typescript
-import { transaction } from '@pipeit/tx-builder';
+import { TransactionBuilder } from '@pipeit/tx-builder';
 import { createSolanaRpc, createSolanaRpcSubscriptions } from '@solana/kit';
 
 const rpc = createSolanaRpc('https://api.mainnet-beta.solana.com');
 const rpcSubscriptions = createSolanaRpcSubscriptions('wss://api.mainnet-beta.solana.com');
 
 // Auto-retry, auto-blockhash fetch, built-in validation
-const signature = await transaction({ autoRetry: true, logLevel: 'verbose' })
+const signature = await new TransactionBuilder({ rpc, autoRetry: true, logLevel: 'verbose' })
+  .setFeePayer(signer.address)
   .addInstruction(yourInstruction)
-  .execute({ feePayer: signer, rpc, rpcSubscriptions });
+  .execute({ rpcSubscriptions });
 ```
 
-### Advanced API (Type-Safe)
+### Multi-Step Flows
+
+For workflows where instructions depend on previous results:
 
 ```typescript
-import { TransactionBuilder } from '@pipeit/tx-builder';
+import { createFlow } from '@pipeit/tx-builder';
 
-// Auto-fetch blockhash when RPC provided
-const message = await new TransactionBuilder({ rpc, version: 0 })
-  .setFeePayer(address)
-  .addInstruction(instruction)
-  .build(); // Type-safe + auto-blockhash!
+const result = await createFlow({ rpc, rpcSubscriptions, signer })
+  .step('create-account', (ctx) => createAccountInstruction(...))
+  .step('init-metadata', (ctx) => {
+    // Access previous step results
+    const prevResult = ctx.get('create-account');
+    return initMetadataInstruction(prevResult, ...);
+  })
+  .atomic('swap', [
+    (ctx) => wrapSolInstruction(...),
+    (ctx) => swapInstruction(...),
+  ])
+  .onStepComplete((name, result) => console.log(`${name}: ${result.signature}`))
+  .execute();
+```
+
+### Static Instruction Plans (Kit Integration)
+
+For advanced users who know all instructions upfront:
+
+```typescript
+import { sequentialInstructionPlan, executePlan } from '@pipeit/tx-builder';
+
+// Kit's instruction-plans are re-exported for advanced use cases
+const plan = sequentialInstructionPlan([ix1, ix2, ix3, ix4, ix5]);
+const result = await executePlan(plan, { rpc, rpcSubscriptions, signer });
 ```
 
 ### Simulation
 
 ```typescript
-const result = await transaction()
+const result = await new TransactionBuilder({ rpc })
+  .setFeePayer(signer.address)
   .addInstruction(instruction)
-  .simulate({ feePayer: signer, rpc });
+  .simulate();
 
 if (result.err) {
   console.error('Simulation failed:', result.logs);
@@ -68,10 +88,8 @@ if (result.err) {
 
 ```typescript
 import { IdlProgramRegistry } from '@pipeit/tx-idl';
-import { transaction } from '@pipeit/tx-builder';
-import { createSolanaRpc } from '@solana/kit';
+import { TransactionBuilder } from '@pipeit/tx-builder';
 
-const rpc = createSolanaRpc('https://api.mainnet-beta.solana.com');
 const registry = new IdlProgramRegistry();
 await registry.registerProgram(programId, rpc);
 
@@ -88,25 +106,17 @@ const instruction = await registry.buildInstruction(
   { signer: userAddress, programId, rpc }
 );
 
-const signature = await transaction()
+const signature = await new TransactionBuilder({ rpc })
+  .setFeePayer(signer.address)
   .addInstruction(instruction)
-  .execute({ feePayer: signer, rpc, rpcSubscriptions });
+  .execute({ rpcSubscriptions });
 ```
-
-## What's New in v0.2?
-
-- ✅ Migrated from Gill to @solana/kit (official Solana SDK)
-- ✅ Consolidated packages for simpler API surface
-- ✅ Auto-blockhash fetching (pass `rpc` to constructor)
-- ✅ Built-in transaction validation
-- ✅ Simulation support with `.simulate()`
-- ✅ Kit assertion helpers (`assertIsAddress`)
-- ✅ Improved TypeScript types
 
 ## Features
 
 ### @pipeit/tx-builder
 
+**Single Transactions:**
 - **Type-Safe Builder**: Compile-time checks ensure all required fields are set
 - **Auto-Blockhash**: Automatically fetches latest blockhash when RPC provided
 - **Smart Defaults**: Opinionated configuration for common use cases
@@ -115,6 +125,17 @@ const signature = await transaction()
 - **Simulation**: Test transactions before sending
 - **Comprehensive Logging**: Verbose error logs with simulation details
 
+**Multi-Step Flows:**
+- **Dynamic Context**: Build instructions that depend on previous step results
+- **Automatic Batching**: Intelligently batch instructions into single transactions
+- **Atomic Groups**: Group instructions that must execute together
+- **Size Handling**: Auto-split transactions that exceed size limits
+- **Execution Hooks**: Monitor step lifecycle with onStepStart, onStepComplete, onStepError
+
+**Kit Integration:**
+- **Instruction Plans**: Re-exports `@solana/instruction-plans` for advanced planning
+- **executePlan()**: Execute Kit instruction plans with TransactionBuilder features
+
 ### @pipeit/tx-idl
 
 - **Automatic IDL Fetching**: Fetch program IDLs from on-chain or registries
@@ -122,13 +143,6 @@ const signature = await transaction()
 - **Protocol Plugins**: Extensible system for Jupiter, Kamino, Raydium, etc.
 - **Full Type Support**: Handles all Anchor/Codama type definitions
 - **JSON Schema Generation**: Auto-generate parameter schemas for UIs
-
-### @pipeit/tx-orchestration (EXPERIMENTAL)
-
-- **Multi-Step Flows**: Chain dependent instructions with result passing
-- **Automatic Batching**: Intelligently batch instructions into single transactions
-- **Size Handling**: Auto-split transactions that exceed size limits
-- **Execution Strategies**: Auto, batch, or sequential execution
 
 ## Development
 

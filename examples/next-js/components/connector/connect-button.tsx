@@ -1,6 +1,6 @@
 'use client';
 
-import { useConnector } from '@solana/connector';
+import { useConnector } from '@armadura/connector';
 import { Button } from '@/components/ui/button';
 import {
     DropdownMenu,

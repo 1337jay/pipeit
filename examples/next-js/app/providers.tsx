@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { AppProvider, getDefaultConfig, getDefaultMobileConfig } from '@solana/connector';
+import { AppProvider, getDefaultConfig, getDefaultMobileConfig } from '@armadura/connector';
 import type { ReactNode } from 'react';
 
 export function Providers({ children }: { children: ReactNode }) {

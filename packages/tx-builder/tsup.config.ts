@@ -18,6 +18,7 @@ export default defineConfig((options) => ({
     '@solana/errors',
     '@solana/functional',
     '@solana/instructions',
+    '@solana/programs',
     '@solana/rpc',
     '@solana/rpc-subscriptions',
     '@solana/rpc-types',

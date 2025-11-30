@@ -1,8 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { createPipeline } from '@pipeit/tx-orchestration';
-import type { StepContext } from '@pipeit/tx-orchestration';
+import { createFlow, type FlowConfig } from '@pipeit/tx-builder';
 import { VisualPipeline } from '@/lib/visual-pipeline';
 import {
   getIdlRegistry,
@@ -36,72 +35,73 @@ export function useJupiterKaminoPipeline() {
   const visualPipeline = useMemo(() => {
     const registry = getIdlRegistry();
 
-    const pipeline = createPipeline()
-      // Step 1: Swap 0.05 SOL → USDC on Jupiter (simple IDL approach)
-      .instruction('jupiter-swap', async (ctx: StepContext) => {
-        // Fetch Jupiter quote
-        let quote: any;
-        try {
-          const quoteParams = new URLSearchParams({
-            inputMint: SOL_MINT,
-            outputMint: USDC_MINT,
-            amount: '50000000', // 0.05 SOL
-            slippageBps: '100',
-          });
-          
-          const response = await fetch(`/api/jupiter/quote?${quoteParams}`);
-          if (response.ok) {
-            quote = await response.json();
+    const flowFactory = (config: FlowConfig) =>
+      createFlow(config)
+        // Step 1: Swap 0.05 SOL → USDC on Jupiter (simple IDL approach)
+        .step('jupiter-swap', async (ctx) => {
+          // Fetch Jupiter quote
+          let quote: any;
+          try {
+            const quoteParams = new URLSearchParams({
+              inputMint: SOL_MINT,
+              outputMint: USDC_MINT,
+              amount: '50000000', // 0.05 SOL
+              slippageBps: '100',
+            });
+            
+            const response = await fetch(`/api/jupiter/quote?${quoteParams}`);
+            if (response.ok) {
+              quote = await response.json();
+            }
+          } catch (error) {
+            console.warn('Jupiter quote unavailable:', error);
+            quote = { routePlan: [], outAmount: '0' };
           }
-        } catch (error) {
-          console.warn('Jupiter quote unavailable:', error);
-          quote = { routePlan: [], outAmount: '0' };
-        }
 
-        return await registry.buildInstruction(
-          JUPITER_V6_PROGRAM,
-          'shared_accounts_route',
-          {
-            inputMint: SOL_MINT,
-            outputMint: USDC_MINT,
-            amountIn: 50_000_000n,
-            slippageBps: 100,
-            routePlan: quote?.routePlan || [],
-            quotedOutAmount: BigInt(quote?.outAmount || '0'),
-            platformFeeBps: 0,
-            quoteResponse: quote,
-          },
-          {}, // Accounts auto-discovered by JupiterSwapPlugin
-          {
-            signer: ctx.signer.address,
-            programId: JUPITER_V6_PROGRAM,
-            rpc: ctx.rpc as unknown as Rpc<GetAccountInfoApi>,
-          }
-        );
-      })
+          return await registry.buildInstruction(
+            JUPITER_V6_PROGRAM,
+            'shared_accounts_route',
+            {
+              inputMint: SOL_MINT,
+              outputMint: USDC_MINT,
+              amountIn: 50_000_000n,
+              slippageBps: 100,
+              routePlan: quote?.routePlan || [],
+              quotedOutAmount: BigInt(quote?.outAmount || '0'),
+              platformFeeBps: 0,
+              quoteResponse: quote,
+            },
+            {}, // Accounts auto-discovered by JupiterSwapPlugin
+            {
+              signer: ctx.signer.address,
+              programId: JUPITER_V6_PROGRAM,
+              rpc: ctx.rpc as unknown as Rpc<GetAccountInfoApi>,
+            }
+          );
+        })
 
-      // Step 2: Deposit USDC to Kamino
-      .instruction('kamino-deposit', async (ctx: StepContext) => {
-        // Get swap result to know how much USDC we received
-        const swapResult = ctx.results.get('jupiter-swap');
+        // Step 2: Deposit USDC to Kamino
+        .step('kamino-deposit', async (ctx) => {
+          // Get swap result to know how much USDC we received
+          const swapResult = ctx.get('jupiter-swap');
 
-        return await registry.buildInstruction(
-          KAMINO_LENDING_PROGRAM,
-          'depositReserveLiquidity',
-          {
-            mint: address(USDC_MINT),
-            liquidityAmount: swapResult?.outAmount || 10_000_000n, // Use swap output or fallback
-          },
-          {}, // Accounts auto-discovered by KaminoLendingPlugin!
-          {
-            signer: ctx.signer.address,
-            programId: KAMINO_LENDING_PROGRAM,
-            rpc: ctx.rpc as unknown as Rpc<GetAccountInfoApi>,
-          }
-        );
-      });
+          return await registry.buildInstruction(
+            KAMINO_LENDING_PROGRAM,
+            'depositReserveLiquidity',
+            {
+              mint: address(USDC_MINT),
+              liquidityAmount: (swapResult as any)?.outAmount || 10_000_000n, // Use swap output or fallback
+            },
+            {}, // Accounts auto-discovered by KaminoLendingPlugin!
+            {
+              signer: ctx.signer.address,
+              programId: KAMINO_LENDING_PROGRAM,
+              rpc: ctx.rpc as unknown as Rpc<GetAccountInfoApi>,
+            }
+          );
+        });
 
-    return new VisualPipeline('jupiter-kamino', pipeline, [
+    return new VisualPipeline('jupiter-kamino', flowFactory, [
       { name: 'jupiter-swap', type: 'instruction' },
       { name: 'kamino-deposit', type: 'instruction' },
     ]);
@@ -111,7 +111,7 @@ export function useJupiterKaminoPipeline() {
 }
 
 export const jupiterKaminoCode = `import { IdlProgramRegistry, JupiterSwapPlugin, KaminoLendingPlugin } from '@pipeit/tx-idl'
-import { createPipeline } from '@pipeit/tx-orchestration'
+import { createFlow } from '@pipeit/tx-builder'
 import { address } from '@solana/kit'
 
 // Setup registry with plugins
@@ -122,9 +122,9 @@ registry.use(new KaminoLendingPlugin())
 await registry.registerProgramFromJson(JUPITER_V6, jupiterIdl)
 await registry.registerProgramFromJson(KAMINO, kaminoIdl)
 
-// Build pipeline
-const pipeline = createPipeline()
-  .instruction('swap', async (ctx) => {
+// Build and execute flow
+const result = await createFlow({ rpc, rpcSubscriptions, signer })
+  .step('swap', async (ctx) => {
     // Fetch Jupiter quote for routePlan and quotedOutAmount
     const quote = await fetch(
       \`https://quote-api.jup.ag/v6/quote?inputMint=\${SOL_MINT}&outputMint=\${USDC_MINT}&amount=100000000&slippageBps=100\`
@@ -146,8 +146,8 @@ const pipeline = createPipeline()
       { signer: ctx.signer.address, programId: JUPITER_V6, rpc: ctx.rpc }
     )
   })
-  .instruction('deposit', async (ctx) => {
-    const swapResult = ctx.results.get('swap')
+  .step('deposit', async (ctx) => {
+    const swapResult = ctx.get('swap')
     return await registry.buildInstruction(
       KAMINO,
       'depositReserveLiquidity',
@@ -159,7 +159,6 @@ const pipeline = createPipeline()
       { signer: ctx.signer.address, programId: KAMINO, rpc: ctx.rpc }
     )
   })
+  .execute();
 
-// Execute: 2 transactions (can't batch - deposit depends on swap output)
-await pipeline.execute({ signer, rpc, rpcSubscriptions, strategy: 'auto' })`;
-
+// Execute: 2 transactions (can't batch - deposit depends on swap output)`;

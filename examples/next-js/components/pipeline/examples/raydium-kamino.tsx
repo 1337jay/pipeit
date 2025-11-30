@@ -1,8 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { createPipeline } from '@pipeit/tx-orchestration';
-import type { StepContext } from '@pipeit/tx-orchestration';
+import { createFlow, type FlowConfig, type FlowContext } from '@pipeit/tx-builder';
 import { VisualPipeline } from '@/lib/visual-pipeline';
 import {
   getIdlRegistry,
@@ -18,84 +17,71 @@ export function useRaydiumKaminoPipeline() {
   const visualPipeline = useMemo(() => {
     const registry = getIdlRegistry();
 
-    // Plugin automatically handles wSOL wrapping/unwrapping
-    // Use atomic group to combine pre + main + post instructions into one transaction
-    // Cache the result to avoid multiple calls
-    let cachedResult: {
-      instruction: any;
-      preInstructions?: any[];
-      postInstructions?: any[];
-    } | null = null;
+    const flowFactory = (config: FlowConfig) => {
+      // Plugin automatically handles wSOL wrapping/unwrapping
+      // Use atomic group to combine pre + main + post instructions into one transaction
+      // Cache the result to avoid multiple calls
+      let cachedResult: {
+        instruction: any;
+        preInstructions?: any[];
+        postInstructions?: any[];
+      } | null = null;
 
-    // Helper to build and cache all instructions
-    const buildAllInstructions = async (ctx: StepContext) => {
-      if (!cachedResult) {
-        cachedResult = await registry.buildInstructionWithPrePost(
-          RAYDIUM_CLMM_PROGRAM,
-          'swap_v2',
-          {
-            // Use the ACTUAL mints from the pool, not standard SOL/USDC
-            // This pool uses these specific token mints:
-            inputMint: address(SOL_MINT), // Wrapped SOL
-            outputMint: address(USDC_MINT), // USDC
-            amount: 50_000_000n, // 0.05 tokens (adjust decimals as needed)
-            otherAmountThreshold: 1_000n, // Min output
-            isBaseInput: true,
-            // Raydium CLMM pool
-            poolAddress: address('3ucNos4NbumPLZNWztqGHNFFgkHeRMBQAVemeeomsUxv'),
-          },
-          {},
-          {
-            signer: ctx.signer.address,
-            programId: RAYDIUM_CLMM_PROGRAM,
-            rpc: ctx.rpc as unknown as Rpc<GetAccountInfoApi>,
-          }
-        );
-      }
-      const allInstructions = [
-        ...(cachedResult.preInstructions || []),
-        cachedResult.instruction,
-        ...(cachedResult.postInstructions || []),
-      ];
-      return { instructions: allInstructions, preCount: cachedResult.preInstructions?.length || 0 };
-    };
+      // Helper to build and cache all instructions
+      const buildAllInstructions = async (ctx: FlowContext) => {
+        if (!cachedResult) {
+          cachedResult = await registry.buildInstructionWithPrePost(
+            RAYDIUM_CLMM_PROGRAM,
+            'swap_v2',
+            {
+              // Use the ACTUAL mints from the pool, not standard SOL/USDC
+              // This pool uses these specific token mints:
+              inputMint: address(SOL_MINT), // Wrapped SOL
+              outputMint: address(USDC_MINT), // USDC
+              amount: 50_000_000n, // 0.05 tokens (adjust decimals as needed)
+              otherAmountThreshold: 1_000n, // Min output
+              isBaseInput: true,
+              // Raydium CLMM pool
+              poolAddress: address('3ucNos4NbumPLZNWztqGHNFFgkHeRMBQAVemeeomsUxv'),
+            },
+            {},
+            {
+              signer: ctx.signer.address,
+              programId: RAYDIUM_CLMM_PROGRAM,
+              rpc: ctx.rpc as unknown as Rpc<GetAccountInfoApi>,
+            }
+          );
+        }
+        const allInstructions = [
+          ...(cachedResult.preInstructions || []),
+          cachedResult.instruction,
+          ...(cachedResult.postInstructions || []),
+        ];
+        return { instructions: allInstructions, preCount: cachedResult.preInstructions?.length || 0 };
+      };
 
-    // Create atomic group with steps for each instruction
-    // wSOL wrapping typically has 3 pre-instructions (create ATA, transfer, sync)
-    // and potentially 1 post-instruction (unwrap)
-    const pipeline = createPipeline().atomic('wrap-and-swap', [
-      {
-        name: 'wrap-sol-1',
-        createInstruction: async (ctx: StepContext) => {
+      // Create atomic group with steps for each instruction
+      // wSOL wrapping typically has 3 pre-instructions (create ATA, transfer, sync)
+      // and potentially 1 post-instruction (unwrap)
+      return createFlow(config).atomic('wrap-and-swap', [
+        async (ctx) => {
           const { instructions } = await buildAllInstructions(ctx);
           return instructions[0];
         },
-      },
-      {
-        name: 'wrap-sol-2',
-        createInstruction: async (ctx: StepContext) => {
+        async (ctx) => {
           const { instructions } = await buildAllInstructions(ctx);
           return instructions[1];
         },
-      },
-      {
-        name: 'wrap-sol-3',
-        createInstruction: async (ctx: StepContext) => {
+        async (ctx) => {
           const { instructions } = await buildAllInstructions(ctx);
           return instructions[2];
         },
-      },
-      {
-        name: 'raydium-swap',
-        createInstruction: async (ctx: StepContext) => {
+        async (ctx) => {
           const { instructions, preCount } = await buildAllInstructions(ctx);
           // Main instruction is at index = preCount
           return instructions[preCount];
         },
-      },
-      {
-        name: 'unwrap-sol',
-        createInstruction: async (ctx: StepContext) => {
+        async (ctx) => {
           const { instructions, preCount } = await buildAllInstructions(ctx);
           // Post-instruction is at index = preCount + 1
           const postIndex = preCount + 1;
@@ -112,10 +98,10 @@ export function useRaydiumKaminoPipeline() {
             data: new Uint8Array(Buffer.from('no-op: no unwrap needed', 'utf-8')),
           };
         },
-      },
-    ]);
+      ]);
+    };
 
-    return new VisualPipeline('raydium-kamino', pipeline, [
+    return new VisualPipeline('raydium-kamino', flowFactory, [
       { name: 'wrap-and-swap', type: 'instruction' },
     ]);
   }, []);
@@ -124,7 +110,7 @@ export function useRaydiumKaminoPipeline() {
 }
 
 export const raydiumKaminoCode = `import { IdlProgramRegistry, RaydiumSwapPlugin, KaminoLendingPlugin } from '@pipeit/tx-idl'
-import { createPipeline } from '@pipeit/tx-orchestration'
+import { createFlow } from '@pipeit/tx-builder'
 import { address } from '@solana/kit'
 
 // Setup registry with plugins
@@ -135,27 +121,18 @@ registry.use(new KaminoLendingPlugin())
 await registry.registerProgramFromJson(RAYDIUM_CLMM_PROGRAM, raydiumIdl)
 await registry.registerProgramFromJson(KAMINO_LENDING_PROGRAM, kaminoIdl)
 
-// Build pipeline
-const pipeline = createPipeline()
+// Build and execute flow
+const result = await createFlow({ rpc, rpcSubscriptions, signer })
   // Wrap SOL + Swap in ONE transaction for efficiency
-  .transaction('wrap-and-swap', async (ctx) => {
-    const instructions = []
-    
-    // 1. Check if wSOL ATA exists, create if needed
-    const wsolAta = address('...')  // Derive from signer + wSOL mint
-    const ataInfo = await ctx.rpc.getAccountInfo(wsolAta, { encoding: 'base64' }).send()
-    if (!ataInfo.value) {
-      instructions.push(createAtaInstruction(...))
-    }
-    
+  .atomic('wrap-and-swap', [
+    // 1. Create wSOL ATA if needed
+    async (ctx) => createAtaInstruction(...),
     // 2. Transfer native SOL to wrap it
-    instructions.push(transferSolInstruction(...))
-    
+    async (ctx) => transferSolInstruction(...),
     // 3. Sync native balance
-    instructions.push(syncNativeInstruction(...))
-    
+    async (ctx) => syncNativeInstruction(...),
     // 4. Swap wSOL → USDC using Raydium CLMM (pure IDL!)
-    const swapIx = await registry.buildInstruction(
+    async (ctx) => registry.buildInstruction(
       RAYDIUM_CLMM_PROGRAM,
       'swap_v2',
       {
@@ -163,28 +140,22 @@ const pipeline = createPipeline()
         outputMint: USDC_MINT,
         amount: 50_000_000n,
         otherAmountThreshold: 1_000n,
-        sqrtPriceLimitX64: 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFn,
         isBaseInput: true,
         poolAddress: address('2QdhepnKRTLjjSqPL1PtKNwqrUkoLee5Gqs8bvZhRdMv'),
       },
       {}, // All accounts auto-discovered!
       { signer: ctx.signer.address, programId: RAYDIUM_CLMM_PROGRAM, rpc: ctx.rpc }
-    )
-    instructions.push(swapIx)
-    
-    return instructions  // All 4 instructions in 1 atomic transaction!
-  })
-  .transaction('kamino-deposit', async (ctx) => {
-    const depositIx = await registry.buildInstruction(
+    ),
+  ])
+  .step('kamino-deposit', async (ctx) => {
+    return registry.buildInstruction(
       KAMINO_LENDING_PROGRAM,
       'depositReserveLiquidity',
       { mint: address(USDC_MINT), liquidityAmount: 10_000_000n },
       {},
       { signer: ctx.signer.address, programId: KAMINO_LENDING_PROGRAM, rpc: ctx.rpc }
     )
-    return [depositIx]
   })
+  .execute();
 
-// Execute: 2 transactions total (wrap+swap batched, then kamino)
-await pipeline.execute({ signer, rpc, rpcSubscriptions })`;
-
+// Execute: 2 transactions total (wrap+swap batched, then kamino)`;

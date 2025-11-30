@@ -20,7 +20,6 @@
         ],
         "paths": {
             "@/*": ["./*"],
-            "@pipeit/tx-orchestration": ["../../packages/tx-orchestration/dist"],
             "@pipeit/tx-builder": ["../../packages/tx-builder/dist"],
             "@pipeit/tx-idl": ["../../packages/tx-idl/dist"]
         }

@@ -8,8 +8,8 @@
  */
 
 import { useState } from 'react';
-import { useConnectorClient } from '@solana/connector';
-import { getLatestBlockhash, isLegacyConnection, isKitConnection } from '@solana/connector/headless';
+import { useConnectorClient } from '@armadura/connector';
+import { getLatestBlockhash, isLegacyConnection, isKitConnection } from '@armadura/connector/headless';
 import { createSolanaRpc } from '@solana/kit';
 import { Connection } from '@solana/web3.js';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
