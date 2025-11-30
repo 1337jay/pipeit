@@ -59,7 +59,7 @@ export function PipeitSolTransfer() {
             // Pipeit's fluent API handles everything: blockhash fetching, building, signing, and confirmation
             const transactionSignature = await new TransactionBuilder({ 
                 rpc,
-                priorityLevel: 'medium', 
+                priorityFee: 'medium', 
                 autoRetry: true 
             })
                 .setFeePayer(signer.address)

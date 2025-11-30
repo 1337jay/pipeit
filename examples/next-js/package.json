@@ -10,6 +10,7 @@
     },
     "dependencies": {
         "@phosphor-icons/react": "^2.1.10",
+        "@pipeit/actions": "workspace:*",
         "@pipeit/tx-builder": "workspace:*",
         "@pipeit/tx-idl": "workspace:*",
         "@radix-ui/react-avatar": "^1.1.10",

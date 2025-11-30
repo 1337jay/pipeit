@@ -15,10 +15,8 @@ import {
   batchedTransfersCode,
   useMixedPipeline,
   mixedPipelineCode,
-  useRaydiumKaminoPipeline,
-  raydiumKaminoCode,
-  useInstructionPlanPipeline,
-  instructionPlanCode,
+  jupiterSwapCode,
+  useJupiterSwapPipeline,
 } from '@/components/pipeline/examples';
 import { ConnectButton } from '@/components/connector';
 import { PipelineHeaderButton } from '@/components/pipeline/pipeline-header-button';
@@ -52,6 +50,13 @@ const pipelineExamples: PipelineExampleConfig[] = [
     description: 'Instruction and transaction steps - shows when batching breaks',
     hook: useMixedPipeline,
     code: mixedPipelineCode,
+  },
+  {
+    id: 'jupiter-swap',
+    name: 'Jupiter Swap',
+    description: 'Swap tokens using Jupiter aggregator',
+    hook: useJupiterSwapPipeline,
+    code: jupiterSwapCode,
   },
   // {
   //   id: 'raydium-kamino',
