@@ -19,7 +19,12 @@
  * @packageDocumentation
  */
 
-import { createFlow, TransactionBuilder } from '@pipeit/tx-builder';
+import {
+  TransactionBuilder,
+  fetchAddressLookupTables,
+  type AddressesByLookupTableAddress,
+} from '@pipeit/tx-builder';
+import { address } from '@solana/addresses';
 import type { Instruction } from '@solana/instructions';
 import type {
   ActionContext,
@@ -31,6 +36,7 @@ import type {
   PipeResult,
   SwapParams,
 } from './types.js';
+import { NoActionsError, NoAdapterError, ActionExecutionError } from './errors.js';
 
 /**
  * Fluent builder for composing DeFi actions into atomic transactions.
@@ -87,10 +93,7 @@ export class Pipe {
    */
   swap(params: SwapParams): this {
     if (!this.config.adapters?.swap) {
-      throw new Error(
-        'No swap adapter configured. Pass a swap adapter in pipe config:\n' +
-        'pipe({ ..., adapters: { swap: jupiter() } })'
-      );
+      throw new NoAdapterError('swap');
     }
 
     const executor = this.config.adapters.swap.swap(params);
@@ -159,32 +162,56 @@ export class Pipe {
 
   /**
    * Execute all actions in the pipe as a single atomic transaction.
-   * Uses Flow internally for automatic batching and error handling.
+   * Uses TransactionBuilder for full feature support including:
+   * - Address lookup tables (ALTs) for transaction compression
+   * - Priority fees and compute unit configuration
+   * - Auto-retry with configurable backoff
    * 
-   * @param options - Execution options (strategy, commitment)
+   * @param options - Execution options (commitment, abortSignal)
    * @returns The transaction signature and action results
    * 
    * @example
    * ```ts
    * const { signature } = await pipe
    *   .swap({ inputMint: SOL, outputMint: USDC, amount: 10_000_000n })
-   *   .execute({ strategy: 'auto', commitment: 'confirmed' })
+   *   .execute({ commitment: 'confirmed' })
    * 
    * console.log('Transaction:', signature)
    * ```
+   * 
+   * @example With abort signal
+   * ```ts
+   * const controller = new AbortController();
+   * setTimeout(() => controller.abort(), 30_000);
+   * 
+   * const { signature } = await pipe
+   *   .swap({ ... })
+   *   .execute({ abortSignal: controller.signal })
+   * ```
    */
   async execute(options: ExecuteOptions = {}): Promise<PipeResult> {
-    const { strategy = 'auto', commitment = 'confirmed' } = options;
+    const { commitment = 'confirmed', abortSignal } = options;
+
+    // Check if already aborted
+    if (abortSignal?.aborted) {
+      throw new Error('Execution aborted');
+    }
 
     if (this.actions.length === 0) {
-      throw new Error('No actions to execute. Add at least one action to the pipe.');
+      throw new NoActionsError();
     }
 
     // Execute all actions to get their instructions, with hooks
     const actionResults: ActionResult[] = [];
     const allInstructions: Instruction[] = [];
+    let totalComputeUnits = 0;
 
     for (let i = 0; i < this.actions.length; i++) {
+      // Check abort before each action
+      if (abortSignal?.aborted) {
+        throw new Error('Execution aborted');
+      }
+
       const action = this.actions[i];
       
       // Call onActionStart hook
@@ -195,29 +222,59 @@ export class Pipe {
         actionResults.push(result);
         allInstructions.push(...result.instructions);
         
+        // Track compute units
+        if (result.computeUnits) {
+          totalComputeUnits += result.computeUnits;
+        }
+        
         // Call onActionComplete hook
         this.hooks.onActionComplete?.(i, result);
       } catch (error) {
         // Call onActionError hook
         this.hooks.onActionError?.(i, error as Error);
-        throw error;
+        throw new ActionExecutionError(i, error as Error);
       }
     }
 
-    // Use Flow for execution (gets automatic batching, hooks, error handling)
-    const flow = createFlow({
+    // Collect ALT addresses from all action results (deduplicated)
+    const altAddresses = actionResults
+      .flatMap(r => r.addressLookupTableAddresses ?? [])
+      .filter((addr, i, arr) => arr.indexOf(addr) === i);
+
+    // Fetch lookup tables if any ALTs were returned by actions
+    let addressesByLookupTable: AddressesByLookupTableAddress | undefined;
+    if (altAddresses.length > 0) {
+      addressesByLookupTable = await fetchAddressLookupTables(
+        this.config.rpc,
+        altAddresses.map(a => address(a))
+      );
+    }
+
+    // Check abort before execution
+    if (abortSignal?.aborted) {
+      throw new Error('Execution aborted');
+    }
+
+    // Determine compute units: use config, collected from actions, or undefined (let builder decide)
+    const computeUnits = this.config.computeUnits === 'auto'
+      ? (totalComputeUnits > 0 ? totalComputeUnits : undefined)
+      : this.config.computeUnits;
+
+    // Build and execute using TransactionBuilder with all config options
+    const signature = await new TransactionBuilder({
       rpc: this.config.rpc,
-      rpcSubscriptions: this.config.rpcSubscriptions,
-      signer: this.config.signer,
-      strategy,
-      commitment,
-    });
-
-    // Add all instructions as an atomic group
-    flow.atomic('pipe', allInstructions.map((ix) => () => ix));
-
-    const results = await flow.execute();
-    const signature = results.get('pipe')?.signature ?? '';
+      ...(computeUnits !== undefined && { computeUnits }),
+      priorityFee: this.config.priorityFee ?? 'medium',
+      autoRetry: this.config.autoRetry ?? { maxAttempts: 3, backoff: 'exponential' },
+      logLevel: this.config.logLevel ?? 'minimal',
+      ...(addressesByLookupTable && { addressesByLookupTable }),
+    })
+      .setFeePayerSigner(this.config.signer)
+      .addInstructions(allInstructions)
+      .execute({
+        rpcSubscriptions: this.config.rpcSubscriptions,
+        commitment,
+      });
 
     return {
       signature,
@@ -227,9 +284,22 @@ export class Pipe {
 
   /**
    * Simulate the transaction without executing.
-   * Useful for checking if a transaction would succeed.
+   * Useful for checking if a transaction would succeed and estimating compute units.
    * 
    * @returns Simulation results
+   * 
+   * @example
+   * ```ts
+   * const simulation = await pipe
+   *   .swap({ ... })
+   *   .simulate();
+   * 
+   * if (simulation.success) {
+   *   console.log('Estimated CU:', simulation.unitsConsumed);
+   * } else {
+   *   console.error('Simulation failed:', simulation.error);
+   * }
+   * ```
    */
   async simulate(): Promise<{
     success: boolean;
@@ -238,26 +308,37 @@ export class Pipe {
     error?: unknown;
   }> {
     if (this.actions.length === 0) {
-      throw new Error('No actions to simulate. Add at least one action to the pipe.');
+      throw new NoActionsError();
     }
 
     // Execute all actions to get their instructions
     const allInstructions: Instruction[] = [];
     let totalComputeUnits = 0;
 
-    for (const action of this.actions) {
-      const result = await action(this.context);
-      allInstructions.push(...result.instructions);
-      
-      if (result.computeUnits) {
-        totalComputeUnits += result.computeUnits;
+    for (let i = 0; i < this.actions.length; i++) {
+      try {
+        const result = await this.actions[i](this.context);
+        allInstructions.push(...result.instructions);
+        
+        if (result.computeUnits) {
+          totalComputeUnits += result.computeUnits;
+        }
+      } catch (error) {
+        throw new ActionExecutionError(i, error as Error);
       }
     }
 
-    // Build and simulate using tx-builder (Flow doesn't have simulate)
+    // Determine compute units: use config, collected from actions, or default
+    const computeUnits = this.config.computeUnits === 'auto' 
+      ? (totalComputeUnits > 0 ? totalComputeUnits : 400_000)
+      : (this.config.computeUnits ?? (totalComputeUnits > 0 ? totalComputeUnits : 400_000));
+
+    // Build and simulate using tx-builder with config options
     const result = await new TransactionBuilder({
       rpc: this.config.rpc,
-      computeUnits: totalComputeUnits > 0 ? totalComputeUnits : 400_000,
+      computeUnits,
+      priorityFee: this.config.priorityFee ?? 'medium',
+      logLevel: this.config.logLevel ?? 'minimal',
     })
       .setFeePayerSigner(this.config.signer)
       .addInstructions(allInstructions)

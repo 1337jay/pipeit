@@ -40,8 +40,8 @@ export function useJupiterSwapPipeline() {
         // Use TransactionBuilder to execute all Jupiter instructions
         const { TransactionBuilder } = await import('@pipeit/tx-builder');
         
-        // Get lookup table addresses from Jupiter response (cast strings to Address type)
-        const lookupTableAddresses = (result.data?.addressLookupTableAddresses as string[]) ?? [];
+        // Get lookup table addresses from Jupiter response
+        const lookupTableAddresses = result.addressLookupTableAddresses ?? [];
         
         const signature = await new TransactionBuilder({
           rpc: ctx.rpc as any,

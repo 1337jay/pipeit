@@ -45,7 +45,7 @@ export function usePipeMultiSwapPipeline() {
           const { TransactionBuilder } = await import('@pipeit/tx-builder');
           const { address } = await import('@solana/kit');
           
-          const lookupTables = (result.data?.addressLookupTableAddresses as string[]) ?? [];
+          const lookupTables = result.addressLookupTableAddresses ?? [];
           const lookupTableAddrs = lookupTables.map(addr => address(addr));
 
           const { value: blockhash } = await (ctx.rpc as any).getLatestBlockhash().send();
@@ -87,7 +87,7 @@ export function usePipeMultiSwapPipeline() {
           const { TransactionBuilder } = await import('@pipeit/tx-builder');
           const { address } = await import('@solana/kit');
           
-          const lookupTables = (result.data?.addressLookupTableAddresses as string[]) ?? [];
+          const lookupTables = result.addressLookupTableAddresses ?? [];
           const lookupTableAddrs = lookupTables.map(addr => address(addr));
 
           const { value: blockhash } = await (ctx.rpc as any).getLatestBlockhash().send();
@@ -128,33 +128,37 @@ const USDC = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
 const BONK = 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263'
 
 // Multi-swap flow: SOL → USDC → BONK
-// Pipe handles sequencing and transaction management
-const result = await pipe({
+// Each swap needs its own transaction due to size constraints
+const config = {
   rpc,
   rpcSubscriptions,
   signer,
-  adapters: { swap: jupiter() }
-})
-  // Swap 1: SOL → USDC
+  adapters: { swap: jupiter() },
+  priorityFee: 'high',
+}
+
+// Swap 1: SOL → USDC
+const result1 = await pipe(config)
   .swap({
     inputMint: SOL,
     outputMint: USDC,
     amount: 10_000_000n,    // 0.01 SOL
     slippageBps: 50,
   })
-  // Swap 2: USDC → BONK
+  .onActionStart(() => console.log('Building SOL → USDC swap...'))
+  .execute()
+
+console.log('Swap 1:', result1.signature)
+
+// Swap 2: USDC → BONK
+const result2 = await pipe(config)
   .swap({
     inputMint: USDC,
     outputMint: BONK,
     amount: 100_000n,       // 0.1 USDC
     slippageBps: 100,
   })
-  // Track progress through multi-step flow
-  .onActionStart((i) => console.log(\`Building swap \${i + 1}...\`))
-  .onActionComplete((i) => console.log(\`Swap \${i + 1} confirmed ✓\`))
-  // Execute sequentially (complex swaps need separate txs)
-  .execute({ strategy: 'sequential' })
+  .onActionStart(() => console.log('Building USDC → BONK swap...'))
+  .execute()
 
-// Flow manages blockhash lifecycle for each tx
-console.log('Swap 1:', result.signatures[0])
-console.log('Swap 2:', result.signatures[1])`;
+console.log('Swap 2:', result2.signature)`;

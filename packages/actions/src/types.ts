@@ -15,11 +15,12 @@ import type {
   FlowRpcApi,
   FlowRpcSubscriptionsApi,
   BaseContext,
-  ExecutionStrategy,
+  PriorityFeeLevel,
+  PriorityFeeConfig,
 } from '@pipeit/tx-builder';
 
-// Re-export ExecutionStrategy for convenience
-export type { ExecutionStrategy } from '@pipeit/tx-builder';
+// Re-export tx-builder types for convenience
+export type { PriorityFeeLevel, PriorityFeeConfig } from '@pipeit/tx-builder';
 
 // =============================================================================
 // Re-export shared types from tx-builder with action-specific aliases
@@ -57,6 +58,8 @@ export interface ActionResult {
   instructions: Instruction[];
   /** Suggested compute units for this action (optional hint) */
   computeUnits?: number;
+  /** Address lookup table addresses used by the instructions */
+  addressLookupTableAddresses?: string[];
   /** Any additional data returned by the action */
   data?: Record<string, unknown>;
 }
@@ -147,6 +150,37 @@ export interface PipeConfig extends BaseContext {
     /** Swap adapter (e.g., Jupiter, Raydium API) */
     swap?: SwapAdapter;
   };
+  
+  /**
+   * Priority fee configuration.
+   * - PriorityFeeLevel string: Use preset level ('none', 'low', 'medium', 'high', 'veryHigh')
+   * - PriorityFeeConfig object: Use custom configuration with strategy
+   * @default 'medium'
+   */
+  priorityFee?: PriorityFeeLevel | PriorityFeeConfig;
+  
+  /**
+   * Compute unit configuration.
+   * - 'auto': Use default (no explicit instruction)
+   * - number: Use fixed compute unit limit
+   * @default 'auto'
+   */
+  computeUnits?: 'auto' | number;
+  
+  /**
+   * Auto-retry failed transactions.
+   * - true: Use default retry (3 attempts, exponential backoff)
+   * - false: No retry
+   * - Object: Custom retry configuration
+   * @default { maxAttempts: 3, backoff: 'exponential' }
+   */
+  autoRetry?: boolean | { maxAttempts: number; backoff: 'linear' | 'exponential' };
+  
+  /**
+   * Logging level for transaction building.
+   * @default 'minimal'
+   */
+  logLevel?: 'silent' | 'minimal' | 'verbose';
 }
 
 /**
@@ -154,18 +188,15 @@ export interface PipeConfig extends BaseContext {
  */
 export interface ExecuteOptions {
   /** 
-   * Execution strategy for handling multiple actions.
-   * - 'auto': Try batching, fallback to sequential if transaction too large
-   * - 'batch': Always batch all instructions into one transaction
-   * - 'sequential': Execute each action as a separate transaction
-   * @default 'auto'
-   */
-  strategy?: ExecutionStrategy;
-  /** 
    * Commitment level for transaction confirmation.
    * @default 'confirmed'
    */
   commitment?: 'processed' | 'confirmed' | 'finalized';
+  /**
+   * Optional abort signal to cancel execution.
+   * When aborted, the execution will stop and throw an error.
+   */
+  abortSignal?: AbortSignal;
 }
 
 /**

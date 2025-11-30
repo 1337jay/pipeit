@@ -29,6 +29,16 @@
 // Core API
 export { pipe, Pipe } from './pipe.js';
 
+// Errors
+export {
+  NoActionsError,
+  NoAdapterError,
+  ActionExecutionError,
+  isNoActionsError,
+  isNoAdapterError,
+  isActionExecutionError,
+} from './errors.js';
+
 // Types
 export type {
   ActionContext,
@@ -45,5 +55,6 @@ export type {
   SwapParams,
   SwapResult,
   // Re-exported from tx-builder for convenience
-  ExecutionStrategy,
+  PriorityFeeLevel,
+  PriorityFeeConfig,
 } from './types.js';

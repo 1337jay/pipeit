@@ -5,7 +5,7 @@ A comprehensive Solana transaction building library that reduces boilerplate and
 ## Packages
 
 - **@pipeit/tx-builder** - Main transaction builder with smart defaults, multi-step flows, and Kit instruction-plans integration
-- **@pipeit/tx-idl** - IDL-based transaction building with automatic account discovery
+- **@pipeit/actions** - High-level DeFi actions with pluggable protocol adapters (Jupiter, Raydium, etc.)
 
 ## Installation
 
@@ -13,8 +13,8 @@ A comprehensive Solana transaction building library that reduces boilerplate and
 # Main builder package (recommended for most users)
 pnpm install @pipeit/tx-builder @solana/kit
 
-# IDL-based building
-pnpm install @pipeit/tx-idl @solana/kit
+# High-level DeFi actions
+pnpm install @pipeit/actions @solana/kit
 ```
 
 ## Quick Start
@@ -84,32 +84,26 @@ if (result.err) {
 }
 ```
 
-### IDL-Based Transactions
+### High-Level DeFi Actions
 
 ```typescript
-import { IdlProgramRegistry } from '@pipeit/tx-idl';
-import { TransactionBuilder } from '@pipeit/tx-builder';
+import { pipe, jupiter } from '@pipeit/actions';
 
-const registry = new IdlProgramRegistry();
-await registry.registerProgram(programId, rpc);
+// Simple, composable DeFi actions
+const result = await pipe({
+  rpc,
+  rpcSubscriptions,
+  signer,
+  adapters: { swap: jupiter() }
+})
+  .swap({ 
+    inputMint: SOL_MINT, 
+    outputMint: USDC_MINT, 
+    amount: 100_000_000n  // 0.1 SOL
+  })
+  .execute();
 
-// Automatic account discovery!
-const instruction = await registry.buildInstruction(
-  programId,
-  'swap',
-  { 
-    amountIn: 1000000n, 
-    inputMint: SOL_MINT,    // Auto-derives userSourceTokenAccount
-    outputMint: USDC_MINT   // Auto-derives userDestTokenAccount
-  },
-  {}, // Accounts auto-discovered!
-  { signer: userAddress, programId, rpc }
-);
-
-const signature = await new TransactionBuilder({ rpc })
-  .setFeePayer(signer.address)
-  .addInstruction(instruction)
-  .execute({ rpcSubscriptions });
+console.log('Swap completed:', result.signature);
 ```
 
 ## Features
@@ -136,13 +130,13 @@ const signature = await new TransactionBuilder({ rpc })
 - **Instruction Plans**: Re-exports `@solana/instruction-plans` for advanced planning
 - **executePlan()**: Execute Kit instruction plans with TransactionBuilder features
 
-### @pipeit/tx-idl
+### @pipeit/actions
 
-- **Automatic IDL Fetching**: Fetch program IDLs from on-chain or registries
-- **Account Auto-Discovery**: Automatically resolve accounts, PDAs, and ATAs
-- **Protocol Plugins**: Extensible system for Jupiter, Kamino, Raydium, etc.
-- **Full Type Support**: Handles all Anchor/Codama type definitions
-- **JSON Schema Generation**: Auto-generate parameter schemas for UIs
+- **High-Level DeFi Actions**: Simple, composable API for swaps, lending, staking
+- **Pluggable Adapters**: Protocol-specific adapters (Jupiter, Raydium, etc.)
+- **API-Centric Design**: Delegates complexity to protocol APIs for reliability
+- **Fluent Builder**: Chain multiple actions with `.swap()`, `.add()`, etc.
+- **Built-in Hooks**: Monitor action progress with `onActionStart`, `onActionComplete`
 
 ## Development
 

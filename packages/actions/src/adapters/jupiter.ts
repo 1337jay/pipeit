@@ -249,20 +249,21 @@ export function jupiter(config: JupiterConfig = {}): SwapAdapter {
         console.log('[Jupiter] Lookup tables:', swapData.addressLookupTableAddresses.length);
       }
 
-      // Build the result, only including optional fields if provided
+      // Build the result with all fields at top level for ActionResult compatibility
       const result: {
         instructions: Instruction[];
         computeUnits?: number;
+        addressLookupTableAddresses?: string[];
         data: Record<string, unknown>;
       } = {
         instructions,
+        // Surface ALT addresses at top level for Pipe to collect
+        addressLookupTableAddresses: swapData.addressLookupTableAddresses ?? [],
         data: {
           inputAmount: BigInt(quote.inAmount),
           outputAmount: BigInt(quote.outAmount),
           priceImpactPct: parseFloat(quote.priceImpactPct),
           route: quote.routePlan,
-          // Include lookup tables in data for consumers to use
-          addressLookupTableAddresses: swapData.addressLookupTableAddresses ?? [],
         },
       };
 
