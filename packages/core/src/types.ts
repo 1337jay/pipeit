@@ -8,6 +8,7 @@ import type { Address } from '@solana/addresses';
 import type { Instruction } from '@solana/instructions';
 import type { TransactionMessage } from '@solana/transaction-messages';
 import type { Rpc, GetLatestBlockhashApi } from '@solana/rpc';
+import type { ExecutionConfig } from './execution/types.js';
 
 /**
  * State tracking for transaction builder.
@@ -139,6 +140,36 @@ export interface ExecuteConfig extends SendingConfig {
    * Abort signal to cancel the operation.
    */
   abortSignal?: AbortSignal;
+
+  /**
+   * Execution strategy for transaction submission.
+   * Controls how the transaction is sent to the network.
+   *
+   * Presets:
+   * - 'standard': Default RPC submission only (no Jito, no parallel)
+   * - 'economical': Jito bundle only (good balance of speed and cost)
+   * - 'fast': Jito + parallel RPC race (maximum landing probability)
+   *
+   * Or provide an object for fine-grained control over Jito and parallel settings.
+   *
+   * @default 'standard'
+   *
+   * @example
+   * ```ts
+   * // Use a preset
+   * await builder.execute({ rpcSubscriptions, execution: 'fast' });
+   *
+   * // Fine-grained control
+   * await builder.execute({
+   *   rpcSubscriptions,
+   *   execution: {
+   *     jito: { enabled: true, tipLamports: 50_000n },
+   *     parallel: { enabled: true, endpoints: ['https://my-rpc.com'] },
+   *   },
+   * });
+   * ```
+   */
+  execution?: ExecutionConfig;
 }
 
 
