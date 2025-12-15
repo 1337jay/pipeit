@@ -119,6 +119,22 @@ import { createTipInstruction } from '../execution/jito.js';
 export type ExportFormat = 'base64' | 'base58' | 'bytes';
 
 /**
+ * Error thrown when a transaction execution fails on-chain.
+ * The transaction was confirmed (included in a block) but the program returned an error.
+ */
+export class TransactionExecutionError extends Error {
+  readonly signature: string;
+  readonly err: unknown;
+
+  constructor(signature: string, err: unknown) {
+    super(`Transaction execution failed: ${JSON.stringify(err)}`);
+    this.name = 'TransactionExecutionError';
+    this.signature = signature;
+    this.err = err;
+  }
+}
+
+/**
  * Exported transaction in various formats.
  */
 export type ExportedTransaction = 
@@ -763,6 +779,9 @@ export class TransactionBuilder<TState extends BuilderState = BuilderState> {
       // Now confirm the transaction using standard confirmation
       await this.confirmTransaction(result.signature, rpcSubscriptions, commitment);
       
+      // Verify transaction execution status (catch false positives)
+      await this.verifyTransactionSuccess(rpc, result.signature);
+      
       return result.signature;
     }
     
@@ -774,7 +793,7 @@ export class TransactionBuilder<TState extends BuilderState = BuilderState> {
     
     // Add retry logic if enabled
     if (this.config.autoRetry) {
-      return this.executeWithRetry(sendAndConfirm, signedTransaction, commitment, {
+      return this.executeWithRetry(sendAndConfirm, signedTransaction, commitment, rpc, {
         skipPreflightOnRetry,
         preflightCommitment,
       });
@@ -789,7 +808,12 @@ export class TransactionBuilder<TState extends BuilderState = BuilderState> {
     };
     
     await sendAndConfirm(signedTransaction, sendOptions);
-    return getSignatureFromTransaction(signedTransaction);
+    const signature = getSignatureFromTransaction(signedTransaction);
+    
+    // Verify transaction execution status (catch false positives)
+    await this.verifyTransactionSuccess(rpc, signature);
+    
+    return signature;
   }
 
   /**
@@ -819,10 +843,28 @@ export class TransactionBuilder<TState extends BuilderState = BuilderState> {
     // Wait for confirmation
     for await (const notification of notifications) {
       if (notification.value.err) {
-        throw new Error(`Transaction failed: ${JSON.stringify(notification.value.err)}`);
+        throw new TransactionExecutionError(signature, notification.value.err);
       }
       // Transaction confirmed
       return;
+    }
+  }
+
+  /**
+   * Verify that a transaction executed successfully (no program errors).
+   * This catches false positives where a transaction is confirmed but failed execution.
+   */
+  private async verifyTransactionSuccess(
+    rpc: Rpc<GetSignatureStatusesApi>,
+    signature: string
+  ): Promise<void> {
+    const { value: statuses } = await rpc
+      .getSignatureStatuses([signature as any])
+      .send();
+
+    const status = statuses[0];
+    if (status?.err) {
+      throw new TransactionExecutionError(signature, status.err);
     }
   }
 
@@ -916,6 +958,7 @@ export class TransactionBuilder<TState extends BuilderState = BuilderState> {
     sendAndConfirm: ReturnType<typeof sendAndConfirmTransactionFactory>,
     transaction: any,
     commitment: 'processed' | 'confirmed' | 'finalized',
+    rpc: Rpc<GetSignatureStatusesApi>,
     options?: {
       skipPreflightOnRetry?: boolean;
       preflightCommitment?: 'processed' | 'confirmed' | 'finalized';
@@ -947,7 +990,12 @@ export class TransactionBuilder<TState extends BuilderState = BuilderState> {
         };
         
         await sendAndConfirm(transaction, sendOptions);
-        return getSignatureFromTransaction(transaction);
+        const signature = getSignatureFromTransaction(transaction);
+        
+        // Verify transaction execution status (catch false positives)
+        await this.verifyTransactionSuccess(rpc, signature);
+        
+        return signature;
       } catch (error) {
         if (attempt === maxAttempts) {
           if (this.config.logLevel === 'verbose') {

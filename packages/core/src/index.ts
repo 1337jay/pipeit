@@ -17,7 +17,7 @@
  */
 
 // Main export - unified builder
-export { TransactionBuilder } from './builder/builder.js';
+export { TransactionBuilder, TransactionExecutionError } from './builder/builder.js';
 export type { 
   TransactionBuilderConfig, 
   SimulationResult,
