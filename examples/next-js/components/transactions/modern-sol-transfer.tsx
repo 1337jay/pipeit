@@ -18,7 +18,7 @@ import {
 import { getTransferSolInstruction } from '@solana-program/system';
 
 const LAMPORTS_PER_SOL = 1_000_000_000n;
-import { useGillTransactionSigner, useCluster, useConnectorClient } from '@armadura/connector';
+import { useGillTransactionSigner, useCluster, useConnectorClient } from '@solana/connector';
 import { TransactionForm } from './transaction-form';
 import { TransactionResult } from './transaction-result';
 import { CodeComparison } from './code-comparison';

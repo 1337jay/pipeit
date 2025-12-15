@@ -9,6 +9,7 @@
  * - Priority fee estimation and compute budget management
  * - Address lookup table compression
  * - Advanced sending strategies (skipPreflight, maxRetries)
+ * - Execution strategies (Jito bundles, parallel submission)
  * - Multi-step transaction orchestration (Flow API)
  * - Kit instruction-plans integration
  *
@@ -16,7 +17,7 @@
  */
 
 // Main export - unified builder
-export { TransactionBuilder } from './builder/builder.js';
+export { TransactionBuilder, TransactionExecutionError } from './builder/builder.js';
 export type { 
   TransactionBuilderConfig, 
   SimulationResult,
@@ -86,4 +87,7 @@ export * from './nonce/index.js';
 
 // Lookup Tables - address lookup table utilities
 export * from './lookup-tables/index.js';
+
+// Execution Strategies - Jito bundles and parallel submission
+export * from './execution/index.js';
 

@@ -1,7 +1,7 @@
 'use client';
 
-import { useConnector } from '@armadura/connector';
-import { useCluster } from '@armadura/connector/react';
+import { useConnector } from '@solana/connector';
+import { useCluster } from '@solana/connector/react';
 import { Button } from '@/components/ui/button';
 import {
     DropdownMenu,
@@ -18,7 +18,7 @@ import { motion } from 'motion/react';
 import { WalletModal } from './wallet-modal';
 import { Wallet, LogOut, ChevronDown, AlertCircle, Network, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { SolanaClusterId, SolanaCluster } from '@armadura/connector';
+import type { SolanaClusterId, SolanaCluster } from '@solana/connector';
 
 interface ConnectButtonProps {
     className?: string;

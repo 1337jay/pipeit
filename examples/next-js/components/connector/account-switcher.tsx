@@ -1,6 +1,6 @@
 'use client';
 
-import { useAccount } from '@armadura/connector/react';
+import { useAccount } from '@solana/connector/react';
 import {
     DropdownMenu,
     DropdownMenuContent,

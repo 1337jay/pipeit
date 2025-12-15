@@ -19,6 +19,8 @@ import {
   useJupiterSwapPipeline,
   usePipeMultiSwapPipeline,
   pipeMultiSwapCode,
+  useJitoBundlePipeline,
+  jitoBundleCode,
 } from '@/components/pipeline/examples';
 import { ConnectButton } from '@/components/connector';
 import { PipelineHeaderButton } from '@/components/pipeline/pipeline-header-button';
@@ -66,6 +68,13 @@ const pipelineExamples: PipelineExampleConfig[] = [
     description: 'SOL → USDC → BONK sequential swaps with Flow orchestration',
     hook: usePipeMultiSwapPipeline,
     code: pipeMultiSwapCode,
+  },
+  {
+    id: 'jito-bundle',
+    name: 'Jito Bundle',
+    description: 'MEV-protected bundle submission with Jito tip instructions',
+    hook: useJitoBundlePipeline,
+    code: jitoBundleCode,
   },
   // {
   //   id: 'raydium-kamino',

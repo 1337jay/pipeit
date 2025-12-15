@@ -99,6 +99,13 @@ import {
   compressTransactionMessage,
 } from '../lookup-tables/index.js';
 
+// Execution strategies
+import {
+  resolveExecutionConfig,
+  executeWithStrategy,
+} from '../execution/strategies.js';
+import { createTipInstruction } from '../execution/jito.js';
+
 // ============================================================================
 // Export Types
 // ============================================================================
@@ -110,6 +117,22 @@ import {
  * - `bytes`: Raw bytes, useful for hardware wallets
  */
 export type ExportFormat = 'base64' | 'base58' | 'bytes';
+
+/**
+ * Error thrown when a transaction execution fails on-chain.
+ * The transaction was confirmed (included in a block) but the program returned an error.
+ */
+export class TransactionExecutionError extends Error {
+  readonly signature: string;
+  readonly err: unknown;
+
+  constructor(signature: string, err: unknown) {
+    super(`Transaction execution failed: ${JSON.stringify(err)}`);
+    this.name = 'TransactionExecutionError';
+    this.signature = signature;
+    this.err = err;
+  }
+}
 
 /**
  * Exported transaction in various formats.
@@ -637,7 +660,8 @@ export class TransactionBuilder<TState extends BuilderState = BuilderState> {
   /**
    * Execute the transaction with smart defaults.
    * 
-   * Supports advanced sending options like skipPreflight and maxRetries.
+   * Supports advanced sending options like skipPreflight and maxRetries,
+   * as well as execution strategies for Jito bundles and parallel submission.
    * 
    * Note: Requires feePayer to be set and RPC in config.
    *
@@ -645,6 +669,21 @@ export class TransactionBuilder<TState extends BuilderState = BuilderState> {
    * ```ts
    * // Basic execution
    * const sig = await builder.execute({ rpcSubscriptions });
+   *
+   * // With execution strategy preset
+   * const sig = await builder.execute({
+   *   rpcSubscriptions,
+   *   execution: 'fast', // Jito + parallel for max speed
+   * });
+   *
+   * // With custom execution config
+   * const sig = await builder.execute({
+   *   rpcSubscriptions,
+   *   execution: {
+   *     jito: { enabled: true, tipLamports: 50_000n },
+   *     parallel: { enabled: true, endpoints: ['https://my-rpc.com'] },
+   *   },
+   * });
    *
    * // With sending options
    * const sig = await builder.execute({
@@ -666,6 +705,7 @@ export class TransactionBuilder<TState extends BuilderState = BuilderState> {
       skipPreflightOnRetry = true,
       preflightCommitment = 'confirmed',
       maxRetries,
+      execution,
     } = params;
     
     if (!this.feePayer) {
@@ -678,13 +718,74 @@ export class TransactionBuilder<TState extends BuilderState = BuilderState> {
     
     const rpc = this.config.rpc as unknown as Rpc<GetEpochInfoApi & GetSignatureStatusesApi & SendTransactionApi & GetLatestBlockhashApi>;
     
+    // Resolve execution strategy
+    const executionConfig = resolveExecutionConfig(execution);
+    
+    // If Jito is enabled, we need to add the tip instruction before building
+    // Clone the builder to avoid mutating the original
+    let builderToUse: TransactionBuilder<TState> = this;
+    
+    if (executionConfig.jito.enabled && executionConfig.jito.tipLamports > 0n) {
+      builderToUse = this.clone();
+      const tipInstruction = createTipInstruction(
+        this.feePayer,
+        executionConfig.jito.tipLamports
+      );
+      builderToUse.instructions.push(tipInstruction);
+      
+      if (this.config.logLevel !== 'silent') {
+        console.log(`[Pipeit] Adding Jito tip: ${executionConfig.jito.tipLamports} lamports`);
+      }
+    }
+    
     // Build message using the unified build method
-    const message = await (this as any).build();
+    const message = await (builderToUse as any).build();
     
     // Sign transaction
     const signedTransaction: any = await signTransactionMessageWithSigners(message);
     
-    // Use Kit's sendAndConfirmTransactionFactory
+    // Get base64 encoded transaction for execution strategies
+    const base64Tx = getBase64EncodedWireTransaction(signedTransaction);
+    
+    // Check if we should use execution strategies (Jito or parallel enabled)
+    const useExecutionStrategy = executionConfig.jito.enabled || executionConfig.parallel.enabled;
+    
+    if (useExecutionStrategy) {
+      // Use execution strategy
+      if (this.config.logLevel !== 'silent') {
+        const strategyName = executionConfig.jito.enabled && executionConfig.parallel.enabled
+          ? 'Jito + Parallel'
+          : executionConfig.jito.enabled
+            ? 'Jito'
+            : 'Parallel';
+        console.log(`[Pipeit] Using ${strategyName} execution strategy`);
+      }
+      
+      // Extract RPC URL from the RPC client
+      // Note: We need to get the URL somehow - for now, assume it's available
+      // In practice, users should provide endpoints in parallel config
+      const rpcUrl = this.getRpcUrl();
+      
+      const result = await executeWithStrategy(base64Tx, executionConfig, {
+        ...(rpcUrl && { rpcUrl }),
+        feePayer: this.feePayer,
+        ...(params.abortSignal && { abortSignal: params.abortSignal }),
+      });
+      
+      if (this.config.logLevel !== 'silent') {
+        console.log(`[Pipeit] Transaction landed via ${result.landedVia}${result.latencyMs ? ` in ${result.latencyMs}ms` : ''}`);
+      }
+      
+      // Now confirm the transaction using standard confirmation
+      await this.confirmTransaction(result.signature, rpcSubscriptions, commitment);
+      
+      // Verify transaction execution status (catch false positives)
+      await this.verifyTransactionSuccess(rpc, result.signature);
+      
+      return result.signature;
+    }
+    
+    // Standard execution path (no Jito, no parallel)
     const sendAndConfirm = sendAndConfirmTransactionFactory({ 
       rpc, 
       rpcSubscriptions 
@@ -692,7 +793,7 @@ export class TransactionBuilder<TState extends BuilderState = BuilderState> {
     
     // Add retry logic if enabled
     if (this.config.autoRetry) {
-      return this.executeWithRetry(sendAndConfirm, signedTransaction, commitment, {
+      return this.executeWithRetry(sendAndConfirm, signedTransaction, commitment, rpc, {
         skipPreflightOnRetry,
         preflightCommitment,
       });
@@ -707,7 +808,113 @@ export class TransactionBuilder<TState extends BuilderState = BuilderState> {
     };
     
     await sendAndConfirm(signedTransaction, sendOptions);
-    return getSignatureFromTransaction(signedTransaction);
+    const signature = getSignatureFromTransaction(signedTransaction);
+    
+    // Verify transaction execution status (catch false positives)
+    await this.verifyTransactionSuccess(rpc, signature);
+    
+    return signature;
+  }
+
+  /**
+   * Get the RPC URL from the configured RPC client.
+   * This is a best-effort extraction - may not work for all RPC client types.
+   */
+  private getRpcUrl(): string | undefined {
+    // The RPC client from @solana/rpc doesn't expose the URL directly
+    // Users should configure parallel.endpoints if they want parallel submission
+    // For now, return undefined and let the execution strategy handle it
+    return undefined;
+  }
+
+  /**
+   * Confirm a transaction signature using WebSocket subscriptions.
+   */
+  private async confirmTransaction(
+    signature: string,
+    rpcSubscriptions: RpcSubscriptions<SignatureNotificationsApi & SlotNotificationsApi>,
+    commitment: 'processed' | 'confirmed' | 'finalized'
+  ): Promise<void> {
+    // Subscribe to signature notifications
+    const notifications = await rpcSubscriptions
+      .signatureNotifications(signature as any, { commitment })
+      .subscribe({ abortSignal: AbortSignal.timeout(60_000) });
+
+    // Wait for confirmation
+    for await (const notification of notifications) {
+      if (notification.value.err) {
+        throw new TransactionExecutionError(signature, notification.value.err);
+      }
+      // Transaction confirmed
+      return;
+    }
+  }
+
+  /**
+   * Verify that a transaction executed successfully (no program errors).
+   * This catches false positives where a transaction is confirmed but failed execution.
+   * 
+   * Uses `searchTransactionHistory: true` to perform a ledger lookup instead of relying
+   * on the RPC's in-memory cache. Retries with exponential backoff if the status is null
+   * (not yet available), throwing only after all attempts are exhausted.
+   */
+  private async verifyTransactionSuccess(
+    rpc: Rpc<GetSignatureStatusesApi>,
+    signature: string,
+    options?: {
+      /** Maximum number of retry attempts (default: 5) */
+      maxAttempts?: number;
+      /** Initial delay in milliseconds before first retry (default: 500) */
+      initialDelayMs?: number;
+      /** Maximum delay in milliseconds between retries (default: 4000) */
+      maxDelayMs?: number;
+    }
+  ): Promise<void> {
+    const {
+      maxAttempts = 5,
+      initialDelayMs = 500,
+      maxDelayMs = 4000,
+    } = options ?? {};
+    
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const { value: statuses } = await rpc
+        .getSignatureStatuses([signature as any], {
+          searchTransactionHistory: true,
+        })
+        .send();
+
+      const status = statuses[0];
+      
+      // If we got a definitive status, check for errors
+      if (status !== null) {
+        if (status.err) {
+          throw new TransactionExecutionError(signature, status.err);
+        }
+        // Transaction executed successfully
+        return;
+      }
+      
+      // Status is null - not yet available in ledger
+      if (attempt === maxAttempts) {
+        // Exhausted all attempts without getting a definitive status
+        throw new Error(
+          `Unable to verify transaction status after ${maxAttempts} attempts. ` +
+          `Signature: ${signature}. The transaction may have landed but status could not be confirmed.`
+        );
+      }
+      
+      // Calculate delay with exponential backoff, capped at maxDelayMs
+      const delay = Math.min(
+        initialDelayMs * Math.pow(2, attempt - 1),
+        maxDelayMs
+      );
+      
+      if (this.config.logLevel === 'verbose') {
+        console.log(`[Pipeit] Transaction status not yet available, retrying in ${delay}ms (attempt ${attempt}/${maxAttempts})`);
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
   }
 
   /**
@@ -800,6 +1007,7 @@ export class TransactionBuilder<TState extends BuilderState = BuilderState> {
     sendAndConfirm: ReturnType<typeof sendAndConfirmTransactionFactory>,
     transaction: any,
     commitment: 'processed' | 'confirmed' | 'finalized',
+    rpc: Rpc<GetSignatureStatusesApi>,
     options?: {
       skipPreflightOnRetry?: boolean;
       preflightCommitment?: 'processed' | 'confirmed' | 'finalized';
@@ -831,7 +1039,12 @@ export class TransactionBuilder<TState extends BuilderState = BuilderState> {
         };
         
         await sendAndConfirm(transaction, sendOptions);
-        return getSignatureFromTransaction(transaction);
+        const signature = getSignatureFromTransaction(transaction);
+        
+        // Verify transaction execution status (catch false positives)
+        await this.verifyTransactionSuccess(rpc, signature);
+        
+        return signature;
       } catch (error) {
         if (attempt === maxAttempts) {
           if (this.config.logLevel === 'verbose') {

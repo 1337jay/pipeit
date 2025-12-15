@@ -25,6 +25,13 @@ export const pipelinesManifest: Array<PipelineExampleMeta> = [
     description: 'Instruction and transaction steps - shows when batching breaks',
     section: 'basics',
   },
+  // Advanced
+  {
+    id: 'jito-bundle',
+    name: 'Jito Bundle',
+    description: 'MEV-protected bundle submission with Jito tip instructions',
+    section: 'advanced',
+  },
 ];
 
 
