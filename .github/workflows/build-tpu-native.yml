@@ -166,28 +166,15 @@ jobs:
         with:
           path: packages/fastlane/artifacts
 
-      - name: Move artifacts to npm folders
+      - name: Move artifacts to package root
         run: |
-          cp artifacts/bindings-aarch64-apple-darwin/fastlane.darwin-arm64.node npm/darwin-arm64/
-          cp artifacts/bindings-x86_64-unknown-linux-gnu/fastlane.linux-x64-gnu.node npm/linux-x64-gnu/
-          cp artifacts/bindings-x86_64-pc-windows-msvc/fastlane.win32-x64-msvc.node npm/win32-x64-msvc/
+          cp artifacts/bindings-aarch64-apple-darwin/*.node .
+          cp artifacts/bindings-x86_64-unknown-linux-gnu/*.node .
+          cp artifacts/bindings-x86_64-pc-windows-msvc/*.node .
+          ls -la *.node
         working-directory: packages/fastlane
 
-      - name: List packages
-        run: ls -R packages/fastlane/npm
-        shell: bash
-
-      - name: Publish platform packages
-        run: |
-          npm config set provenance true
-          cd npm/darwin-arm64 && npm publish --access public --no-git-checks || true
-          cd ../linux-x64-gnu && npm publish --access public --no-git-checks || true
-          cd ../win32-x64-msvc && npm publish --access public --no-git-checks || true
-        working-directory: packages/fastlane
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Publish main package
+      - name: Publish
         run: |
           npm config set provenance true
           npm publish --access public --no-git-checks
