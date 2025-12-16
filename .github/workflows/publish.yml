@@ -4,12 +4,17 @@ on:
   push:
     branches:
       - main
-      - tpu-addon
     paths:
       - 'packages/core/**'
       - 'packages/actions/**'
       - '.github/workflows/publish.yml'
   workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publish to npm'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -45,27 +50,21 @@ jobs:
         working-directory: packages/actions
 
       - name: Publish core
+        if: github.event_name == 'workflow_dispatch' && inputs.publish
         run: |
           npm config set provenance true
-          if git log -1 --pretty=%B | grep -E "^[0-9]+\.[0-9]+\.[0-9]+"; then
-            echo "Publishing @pipeit/core..."
-            npm publish --access public --no-git-checks || echo "Package version may already exist"
-          else
-            echo "Not a release commit, skipping publish"
-          fi
+          echo "Publishing @pipeit/core..."
+          npm publish --access public --no-git-checks
         working-directory: packages/core
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish actions
+        if: github.event_name == 'workflow_dispatch' && inputs.publish
         run: |
           npm config set provenance true
-          if git log -1 --pretty=%B | grep -E "^[0-9]+\.[0-9]+\.[0-9]+"; then
-            echo "Publishing @pipeit/actions..."
-            npm publish --access public --no-git-checks || echo "Package version may already exist"
-          else
-            echo "Not a release commit, skipping publish"
-          fi
+          echo "Publishing @pipeit/actions..."
+          npm publish --access public --no-git-checks
         working-directory: packages/actions
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
