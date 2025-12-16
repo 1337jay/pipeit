@@ -166,6 +166,10 @@ jobs:
         with:
           path: packages/fastlane/artifacts
 
+      - name: Create npm package folders
+        run: pnpm exec napi prepublish -t npm
+        working-directory: packages/fastlane
+
       - name: Move artifacts
         run: pnpm artifacts
         working-directory: packages/fastlane
