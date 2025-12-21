@@ -83,12 +83,7 @@ export function useTpuSubmission(apiRoute: string = '/api/tpu') {
                     }),
                 });
 
-                let data;
-                try {
-                    data = await response.json();
-                } catch {
-                    throw new Error(`TPU API returned non-JSON response: ${response.status}`);
-                }
+                const data = await response.json();
 
                 const submissionResult: TpuSubmissionResult = {
                     delivered: data.delivered,
@@ -148,7 +143,6 @@ export function formatTpuErrorCode(code: TpuErrorCode): string {
         TIMEOUT: 'Timeout',
         VALIDATOR_UNREACHABLE: 'Validator Unreachable',
         ZERO_RTT_REJECTED: '0-RTT Rejected',
-        UNKNOWN: 'Unknown Error',
     };
     return labels[code] || code;
 }

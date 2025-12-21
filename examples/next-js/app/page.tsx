@@ -1,4 +1,4 @@
-import { Hero, Benefits, CodeComparison, FeatureExample, PipelineExample } from '@/components/landing';
+import { Hero, Benefits, CodeComparison, Playground } from '@/components/landing';
 
 const beforeCode = `import { 
   createSolanaRpc,
@@ -6,54 +6,55 @@ const beforeCode = `import {
   createTransactionMessage,
   setTransactionMessageFeePayer,
   setTransactionMessageLifetimeUsingBlockhash,
-  appendTransactionMessageInstructions,
-  signTransaction,
-  sendTransaction,
+  appendTransactionMessageInstruction,
+  pipe,
+  sendAndConfirmTransactionFactory,
   address,
   lamports,
-  pipe
 } from '@solana/kit';
+import { signTransactionMessageWithSigners } from '@solana/signers';
 import { getTransferSolInstruction } from '@solana-program/system';
 
 const rpc = createSolanaRpc(rpcUrl);
-const rpcSubscriptions = createSolanaRpcSubscriptions(rpcUrl.replace('http', 'ws'));
+const rpcSubscriptions = createSolanaRpcSubscriptions(wsUrl);
+
 const { value: latestBlockhash } = await rpc.getLatestBlockhash().send();
 
-const transferInstruction = getTransferSolInstruction({
-  source: signer.address,
-  destination: address(recipientAddress),
-  amount: lamports(BigInt(amount * 1_000_000_000)),
-});
-
-const transactionMessage = pipe(
+const message = pipe(
   createTransactionMessage({ version: 0 }),
   tx => setTransactionMessageFeePayer(signer.address, tx),
   tx => setTransactionMessageLifetimeUsingBlockhash(latestBlockhash, tx),
-  tx => appendTransactionMessageInstructions([transferInstruction], tx)
+  tx => appendTransactionMessageInstruction(
+    getTransferSolInstruction({
+      source: signer,
+      destination: address(recipient),
+      amount: lamports(1_000_000_000n),
+    }),
+    tx
+  )
 );
 
-const signedTransaction = await signTransaction([signer], transactionMessage);
-const signature = await sendTransaction(rpc, signedTransaction).send();`;
+const signedTx = await signTransactionMessageWithSigners(message);
+const sendAndConfirm = sendAndConfirmTransactionFactory({ rpc, rpcSubscriptions });
+await sendAndConfirm(signedTx, { commitment: 'confirmed' });`;
 
 const afterCode = `import { TransactionBuilder } from '@pipeit/core';
 import { getTransferSolInstruction } from '@solana-program/system';
 import { address, lamports } from '@solana/kit';
 
-const LAMPORTS_PER_SOL = 1_000_000_000n;
-
-const transferInstruction = getTransferSolInstruction({
-  source: signer,
-  destination: address(recipientAddress),
-  amount: lamports(BigInt(amount * LAMPORTS_PER_SOL)),
-});
-
 const signature = await new TransactionBuilder({ 
   rpc,
   autoRetry: true, 
-  priorityFee: 'medium' 
+  priorityFee: 'medium',
 })
   .setFeePayerSigner(signer)
-  .addInstruction(transferInstruction)
+  .addInstruction(
+    getTransferSolInstruction({
+      source: signer,
+      destination: address(recipient),
+      amount: lamports(1_000_000_000n),
+    })
+  )
   .execute({
     rpcSubscriptions,
     commitment: 'confirmed',
@@ -61,21 +62,23 @@ const signature = await new TransactionBuilder({
 
 export default function Home() {
     return (
-        <div className="max-w-7xl mx-auto min-h-screen bg-bg1 border-r border-l border-sand-200">
-            <main className="container mx-auto">
+        <div className="max-w-7xl mx-auto border-r border-l border-sand-200">
+            {/* Landing content - scrolls normally */}
+            <div className="relative z-0 bg-bg1">
                 <Hero />
                 <Benefits />
                 <CodeComparison
-                    beforeTitle="SolanaKit"
-                    beforeDescription="Transfer SOL using Solana Kit - manual blockhash, signing, and sending"
+                    beforeTitle="@solana/kit"
+                    beforeDescription="Manual blockhash fetching, message building, signing, and confirmation"
                     beforeCode={beforeCode}
-                    afterTitle="PipeIt"
-                    afterDescription="Transfer SOL using Pipe It - automatic blockhash, retry, and confirmation"
+                    afterTitle="@pipeit/core"
+                    afterDescription="Automatic blockhash, retry logic, priority fees, and confirmation"
                     afterCode={afterCode}
                 />
-                <FeatureExample />
-                <PipelineExample />
-            </main>
+            </div>
+            
+            {/* Playground - sticky at top, covers content as it scrolls behind */}
+            <Playground />
         </div>
     );
 }

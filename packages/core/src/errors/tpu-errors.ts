@@ -19,29 +19,8 @@ export type TpuErrorCode =
     | 'NO_LEADERS'
     | 'TIMEOUT'
     | 'VALIDATOR_UNREACHABLE'
-    | 'ZERO_RTT_REJECTED'
-    | 'UNKNOWN';
 
-/**
- * Set of all valid TPU error codes for runtime validation.
- */
-const TPU_ERROR_CODES: ReadonlySet<string> = new Set<TpuErrorCode>([
-    'CONNECTION_FAILED',
-    'STREAM_CLOSED',
-    'RATE_LIMITED',
-    'NO_LEADERS',
-    'TIMEOUT',
-    'VALIDATOR_UNREACHABLE',
-    'ZERO_RTT_REJECTED',
-    'UNKNOWN',
-]);
-
-/**
- * Type guard to check if a string is a valid TpuErrorCode.
- */
-function isTpuErrorCode(code: string): code is TpuErrorCode {
-    return TPU_ERROR_CODES.has(code);
-}
+    | 'ZERO_RTT_REJECTED';
 
 /**
  * Error codes that are safe to retry.
@@ -94,30 +73,16 @@ export class TpuSubmissionError extends Error {
 
     /**
      * Creates a TpuSubmissionError from a raw error code string.
-     *
-     * Validates the code against known TpuErrorCode values. If the code
-     * is not recognized, falls back to UNKNOWN and includes the original
-     * code in the error message.
      */
     static fromCode(
         code: string,
         message?: string,
         validatorIdentity?: string,
     ): TpuSubmissionError {
-        const normalizedCode = code.toUpperCase();
-
-        if (isTpuErrorCode(normalizedCode)) {
-            return new TpuSubmissionError(
-                normalizedCode,
-                message || `TPU submission failed: ${code}`,
-                validatorIdentity,
-            );
-        }
-
-        // Invalid code: use UNKNOWN fallback and include original code in message
+        const errorCode = code.toUpperCase() as TpuErrorCode;
         return new TpuSubmissionError(
-            'UNKNOWN',
-            message || `TPU submission failed with unrecognized code: ${code}`,
+            errorCode,
+            message || `TPU submission failed: ${code}`,
             validatorIdentity,
         );
     }

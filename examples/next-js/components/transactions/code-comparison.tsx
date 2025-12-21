@@ -1,8 +1,8 @@
 'use client';
 
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { CodeBlock } from '@/components/code/code-block';
 
 interface CodeComparisonProps {
     title: string;
@@ -16,19 +16,17 @@ export function CodeComparison({ title, code }: CodeComparisonProps) {
                 <CardTitle className="text-body-md font-berkeley-mono">{title}</CardTitle>
             </CardHeader>
             <CardContent>
-                <SyntaxHighlighter
-                    language="typescript"
+                <CodeBlock
+                    code={code}
                     style={vscDarkPlus}
+                    showLineNumbers
                     customStyle={{
                         margin: 0,
                         borderRadius: '0.5rem',
                         fontSize: '0.75rem',
                         lineHeight: '1.25rem',
                     }}
-                    showLineNumbers
-                >
-                    {code}
-                </SyntaxHighlighter>
+                />
             </CardContent>
         </Card>
     );

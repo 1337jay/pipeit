@@ -1,7 +1,7 @@
 'use client';
 
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { CodeBlock } from '@/components/code/code-block';
 
 interface CodeComparisonProps {
     beforeTitle: string;
@@ -22,7 +22,7 @@ export function CodeComparison({
 }: CodeComparisonProps) {
     return (
         <section
-            className="py-16 border-t border-b border-sand-200"
+            className="py-16 border-t border-sand-200"
             style={{
                 backgroundImage: `repeating-linear-gradient(
               45deg,
@@ -49,19 +49,17 @@ export function CodeComparison({
                                 <p className="text-xs font-berkeley-mono text-gray-600 mt-1">{beforeDescription}</p>
                             )}
                         </div>
-                        <SyntaxHighlighter
-                            language="typescript"
+                        <CodeBlock
+                            code={beforeCode}
                             style={oneLight}
+                            showLineNumbers
                             customStyle={{
                                 margin: 0,
                                 borderRadius: '0.5rem',
                                 fontSize: '0.75rem',
                                 lineHeight: '1.25rem',
                             }}
-                            showLineNumbers
-                        >
-                            {beforeCode}
-                        </SyntaxHighlighter>
+                        />
                     </div>
                     <div className="bg-[var(--color-bg1)] border-l border-sand-300 p-6">
                         <div className="mb-4">
@@ -70,19 +68,17 @@ export function CodeComparison({
                                 <p className="text-xs font-berkeley-mono text-gray-600 mt-1">{afterDescription}</p>
                             )}
                         </div>
-                        <SyntaxHighlighter
-                            language="typescript"
+                        <CodeBlock
+                            code={afterCode}
                             style={oneLight}
+                            showLineNumbers
                             customStyle={{
                                 margin: 0,
                                 borderRadius: '0.5rem',
                                 fontSize: '0.75rem',
                                 lineHeight: '1.25rem',
                             }}
-                            showLineNumbers
-                        >
-                            {afterCode}
-                        </SyntaxHighlighter>
+                        />
                     </div>
                 </div>
             </div>

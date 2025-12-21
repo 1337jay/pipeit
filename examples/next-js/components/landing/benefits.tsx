@@ -1,58 +1,51 @@
 'use client';
 
-import { IconXmarkCircleFill } from 'symbols-react';
+import { IconArrowDownAppDashedTrianglebadgeExclamationmark, IconArrowtriangleRightAndLineVerticalAndArrowtriangleLeftFill, IconCharacterMagnify, IconCursorarrowClick2, IconDigitalcrownHorizontalArrowClockwiseFill, IconGaugeWithDotsNeedle67percent, IconInfinity, IconTrayAndArrowUpFill, IconXmarkCircleFill } from 'symbols-react';
 
 const benefits = [
     {
-        name: 'Build Complex Flows Easily',
-        description: 'Chain multi-step transaction flows with automatic batching and intelligent instruction grouping.',
-        icon: IconXmarkCircleFill,
+        name: 'Built-in Retry Logic',
+        description: 'Exponential backoff with configurable attempts and rich error types for debugging.',
+        icon: IconDigitalcrownHorizontalArrowClockwiseFill,
     },
     {
-        name: 'Catch Errors Before Runtime',
-        description:
-            'Type-safe builder with compile-time validation prevents incomplete transactions from reaching the network.',
-        icon: IconXmarkCircleFill,
+        name: 'Pre-flight Simulation',
+        description: 'Test transactions before sending to catch errors early and save on network fees.',
+        icon: IconArrowDownAppDashedTrianglebadgeExclamationmark,
     },
     {
-        name: 'Zero Manual Configuration',
-        description:
-            'Automatic blockhash fetching, lifetime tracking, and transaction lifecycle management with durable nonce support.',
-        icon: IconXmarkCircleFill,
+        name: 'Priority Fee Presets',
+        description: 'Choose from none/low/medium/high/veryHigh or use percentile-based estimation.',
+        icon: IconGaugeWithDotsNeedle67percent,
     },
     {
-        name: 'Never Lose a Transaction',
-        description: 'Built-in retry logic with exponential backoff and rich error types for easy debugging.',
-        icon: IconXmarkCircleFill,
+        name: 'Address Lookup Tables',
+        description: 'Automatic ALT compression for v0 transactions reduces size and cost.',
+        icon: IconCharacterMagnify,
     },
     {
-        name: 'Test Before You Send',
-        description:
-            'Pre-flight simulation catches errors early to reduce failed transactions and save on network fees.',
-        icon: IconXmarkCircleFill,
+        name: 'Durable Nonce Support',
+        description: 'Create long-lived transactions that don\'t expire with blockhash.',
+        icon: IconInfinity,
     },
     {
-        name: 'Optimize Transaction Costs',
-        description:
-            'Simple priority fee presets and automatic compute unit optimization prevent transaction failures.',
-        icon: IconXmarkCircleFill,
+        name: 'Composable Middleware',
+        description: 'Plug in logging, simulation, retry, or custom logic at any execution step.',
+        icon: IconArrowtriangleRightAndLineVerticalAndArrowtriangleLeftFill,
     },
     {
-        name: 'Extend & Customize',
-        description:
-            'Composable middleware system for logging, monitoring, retry, and simulation with reusable components.',
-        icon: IconXmarkCircleFill,
+        name: 'Export Any Format',
+        description: 'Output base64, base58, or raw bytes for custom transports and hardware wallets.',
+        icon: IconTrayAndArrowUpFill,
     },
     {
-        name: 'No Transaction Size Limits',
-        description:
-            'Automatically detects and splits oversized transactions to eliminate "transaction too large" errors.',
-        icon: IconXmarkCircleFill,
+        name: 'Continuous Resubmission',
+        description: 'TPU client resubmits until confirmed for highest possible landing rates.',
+        icon: IconCursorarrowClick2,
     },
     {
-        name: 'Guarantee Execution Order',
-        description:
-            'Atomic grouping ensures instructions execute together or not at all for critical DeFi operations.',
+        name: 'Rich Error Diagnostics',
+        description: 'Human-readable error messages with program-specific context and debugging hints.',
         icon: IconXmarkCircleFill,
     },
 ];
@@ -64,14 +57,14 @@ export function Benefits() {
                 <dl className="mx-auto mt-16 grid max-w-2xl grid-cols-1 gap-8 text-base/7 text-gray-600 sm:grid-cols-2 lg:mx-0 lg:max-w-none lg:grid-cols-3 lg:gap-x-16">
                     {benefits.map(benefit => (
                         <div key={benefit.name} className="relative pl-9">
-                            <dt className="inline font-semibold text-gray-900">
+                            <dt className="inline font-semibold text-sand-1500">
                                 <benefit.icon
                                     aria-hidden="true"
-                                    className="absolute top-1 left-1 size-5 text-gray-900"
+                                    className="absolute top-1 left-1 size-5 fill-sand-600"
                                 />
                                 {benefit.name}
                             </dt>{' '}
-                            <dd className="inline">{benefit.description}</dd>
+                            <dd className="inline text-sand-1000">{benefit.description}</dd>
                         </div>
                     ))}
                 </dl>

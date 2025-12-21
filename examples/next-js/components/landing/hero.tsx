@@ -10,18 +10,28 @@ export function Hero() {
                     Build Solana transactions <br />
                     without complexity
                 </h1>
-                <p className="text-body-xl text-gray-600 max-w-xl mx-auto mb-8">
-                    Type-safe, composable transaction builder with automatic retry, priority fees, and smart defaults
+                <p className="text-body-xl text-gray-600 max-w-2xl mx-auto mb-8">
+                    Type-safe, composable transaction builder with automatic retry, priority fees, and smart defaults, and multiple execution paths
                     built on top of @solana/kit.
                 </p>
-                <CopyButton
-                    textToCopy="npm install @pipeit/core"
-                    displayText={<code>npm i @pipeit/core</code>}
-                    className="inline-flex items-center gap-2 bg-sand-100 rounded-lg px-4 py-2 font-berkeley-mono text-sm text-gray-900 hover:bg-sand-100/50 border border-sand-200 transition-colors"
-                    iconClassName="text-gray-600"
-                    iconClassNameCheck="text-gray-900"
-                    showText={true}
-                />
+                <div id="hero-copy-buttons">
+                    <CopyButton
+                        textToCopy="npm install @pipeit/core"
+                        displayText={<code>npm i @pipeit/core</code>}
+                        className="inline-flex items-center gap-2 bg-sand-100 rounded-lg px-4 py-2 font-berkeley-mono text-sm text-gray-900 hover:bg-sand-100/50 border border-sand-200 transition-colors mr-2"
+                        iconClassName="text-gray-600"
+                        iconClassNameCheck="text-gray-900"
+                        showText={true}
+                    />
+                    <CopyButton
+                        textToCopy="npm install @pipeit/fastlane"
+                        displayText={<code>npm i @pipeit/fastlane</code>}
+                        className="inline-flex items-center gap-2 bg-sand-100 rounded-lg px-4 py-2 font-berkeley-mono text-sm text-gray-900 hover:bg-sand-100/50 border border-sand-200 transition-colors"
+                        iconClassName="text-gray-600"
+                        iconClassNameCheck="text-gray-900"
+                        showText={true}
+                    />
+                </div>
             </div>
         </section>
     );

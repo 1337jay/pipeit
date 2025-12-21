@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -29,6 +28,7 @@ import { ConnectButton } from '@/components/connector';
 import { PipelineHeaderButton } from '@/components/pipeline/pipeline-header-button';
 import { TpuResultsPanel } from '@/components/pipeline';
 import { tpuEvents } from '@/lib/tpu-events';
+import { CodeBlock } from '@/components/code/code-block';
 
 interface PipelineExampleConfig {
     id: string;
@@ -88,20 +88,6 @@ const pipelineExamples: PipelineExampleConfig[] = [
         hook: useTpuDirectPipeline,
         code: tpuDirectCode,
     },
-    // {
-    //   id: 'raydium-kamino',
-    //   name: 'Raydium + Kamino',
-    //   description: 'Raydium CLMM swap + Kamino deposit - pure IDL with auto account discovery',
-    //   hook: useRaydiumKaminoPipeline,
-    //   code: raydiumKaminoCode,
-    // },
-    // {
-    //   id: 'instruction-plan',
-    //   name: 'Instruction Plan',
-    //   description: 'Kit instruction-plans with executePlan - static planning with automatic batching',
-    //   hook: useInstructionPlanPipeline,
-    //   code: instructionPlanCode,
-    // },
 ];
 
 function PipelineExampleCard({ example }: { example: PipelineExampleConfig }) {
@@ -112,22 +98,17 @@ function PipelineExampleCard({ example }: { example: PipelineExampleConfig }) {
     const visualPipeline = example.hook();
     const isTpuExample = example.id === 'tpu-direct';
 
-    // Track pipeline state for TPU results
     const isExecuting = visualPipeline.state === 'executing';
 
-    // Listen for TPU events from @pipeit/core
     useEffect(() => {
         if (!isTpuExample) return;
 
-        // Start listening for pipeit:tpu:* CustomEvents
         tpuEvents.startIntercepting();
 
-        // Subscribe to TPU start events
         const unsubStart = tpuEvents.onStart(() => {
             setTpuSending(true);
         });
 
-        // Subscribe to TPU results
         const unsubResult = tpuEvents.onResult(result => {
             setTpuResult(result);
             setTpuSending(false);
@@ -140,30 +121,29 @@ function PipelineExampleCard({ example }: { example: PipelineExampleConfig }) {
         };
     }, [isTpuExample]);
 
-
     return (
         <section className="py-16 border-b border-sand-200 last:border-b-0">
             <div className="grid grid-cols-12 gap-8">
-                {/* Left column: Title and Description */}
                 <div className="col-span-4 flex flex-col justify-start px-6">
                     <h2 className="text-2xl font-abc-diatype-medium text-gray-900 mb-2">{example.name}</h2>
                     <p className="text-sm font-berkeley-mono text-gray-600">{example.description}</p>
+
+                    {isTpuExample && (
+                        <div className="mt-6">
+                            <TpuResultsPanel result={tpuResult} isExecuting={isExecuting || tpuSending} />
+                        </div>
+                    )}
                 </div>
 
-                {/* Right column: Tabs with Visualization and Code */}
                 <div className="col-span-8 px-6">
                     <Tabs defaultValue="visualization" className="w-full">
-                        {/* Strategy buttons, Execute Button, Connect Button on left; Tabs on right */}
                         <div className="flex flex-row-reverse justify-between items-center mb-4">
-                            {/* Tabs on right */}
                             <TabsList>
                                 <TabsTrigger value="visualization">Visualization</TabsTrigger>
                                 <TabsTrigger value="code">Code</TabsTrigger>
                             </TabsList>
 
-                            {/* Strategy switcher buttons, Execute Button, and Connect Button on left */}
                             <div className="flex flex-row gap-2 flex-nowrap items-center">
-                                {/* Connected strategy buttons */}
                                 <div className="flex flex-row">
                                     {(['auto', 'batch', 'sequential'] as const).map((s, index, arr) => (
                                         <Button
@@ -197,32 +177,22 @@ function PipelineExampleCard({ example }: { example: PipelineExampleConfig }) {
                             <Card
                                 className={cn(
                                     'border-sand-300 bg-sand-100/30 rounded-xl shadow-sm overflow-visible',
-                                    isTpuExample ? 'min-h-[420px]' : 'max-h-[340px] min-h-[340px]'
+                                    'max-h-[340px] min-h-[340px]',
                                 )}
                                 style={{
                                     backgroundImage: `repeating-linear-gradient(
-                  45deg,
-                  transparent,
-                  transparent 10px,
-                  rgba(233, 231, 222, 0.5) 10px,
-                  rgba(233, 231, 222, 0.5) 11px
-                )`,
+                                        45deg,
+                                        transparent,
+                                        transparent 10px,
+                                        rgba(233, 231, 222, 0.5) 10px,
+                                        rgba(233, 231, 222, 0.5) 11px
+                                    )`,
                                 }}
                             >
                                 <CardContent className="flex flex-col h-full overflow-visible">
                                     <div className={isTpuExample ? 'flex-1 min-h-[280px]' : ''}>
                                         <PipelineVisualization visualPipeline={visualPipeline} strategy={strategy} />
                                     </div>
-                                    
-                                    {/* TPU Results Panel */}
-                                    {isTpuExample && (
-                                        <div className="pt-4 pb-2">
-                                            <TpuResultsPanel 
-                                                result={tpuResult} 
-                                                isExecuting={isExecuting || tpuSending}
-                                            />
-                                        </div>
-                                    )}
                                 </CardContent>
                             </Card>
                         </TabsContent>
@@ -230,19 +200,17 @@ function PipelineExampleCard({ example }: { example: PipelineExampleConfig }) {
                         <TabsContent value="code" className="mt-0">
                             <Card className="border-sand-300 bg-white rounded-xl shadow-sm max-h-[360px] min-h-[360px] overflow-y-auto">
                                 <CardContent className="">
-                                    <SyntaxHighlighter
-                                        language="typescript"
+                                    <CodeBlock
+                                        code={example.code}
                                         style={oneLight}
+                                        showLineNumbers
                                         customStyle={{
                                             margin: 0,
                                             borderRadius: '0.5rem',
                                             fontSize: '0.75rem',
                                             lineHeight: '1.25rem',
                                         }}
-                                        showLineNumbers
-                                    >
-                                        {example.code}
-                                    </SyntaxHighlighter>
+                                    />
                                 </CardContent>
                             </Card>
                         </TabsContent>
@@ -253,34 +221,42 @@ function PipelineExampleCard({ example }: { example: PipelineExampleConfig }) {
     );
 }
 
-export default function PlaygroundPage() {
+export function Playground() {
     return (
-        <div className="max-w-7xl mx-auto min-h-screen bg-bg1 border-r border-l border-sand-200">
-            <main className="container mx-auto">
-                <section
-                    className="py-16 border-b border-sand-200"
-                    style={{
-                        backgroundImage: `repeating-linear-gradient(
-            45deg,
-            transparent,
-            transparent 10px,
-            rgba(233, 231, 222, 0.5) 10px,
-            rgba(233, 231, 222, 0.5) 11px
-          )`,
-                    }}
-                >
-                    <div className="max-w-7xl mx-auto">
-                        <h1 className="text-h2 text-gray-900 mb-2 text-center text-pretty">PipeIt Playground</h1>
-                        <p className="text-body-xl text-gray-600 text-center max-w-3xl mx-auto">
-                            Interactive real mainnet examples of multi-step pipelines and atomic transactions
-                        </p>
+        <section id="playground" className="scroll-mt-16">
+            <div className="sticky top-16 z-10 h-[calc(100vh-4rem)] bg-bg1 border-t border-sand-200">
+                <div className="flex h-full flex-col">
+                    <div className="shrink-0">
+                        <section
+                            className="py-8 border-b border-sand-200"
+                            style={{
+                                backgroundImage: `repeating-linear-gradient(
+                                    45deg,
+                                    transparent,
+                                    transparent 10px,
+                                    rgba(233, 231, 222, 0.5) 10px,
+                                    rgba(233, 231, 222, 0.5) 11px
+                                )`,
+                            }}
+                        >
+                            <div className="max-w-7xl mx-auto">
+                                <h2 className="text-h2 text-gray-900 mb-2 text-center text-pretty">
+                                    Interactive Playground
+                                </h2>
+                                <p className="text-body-xl text-gray-600 text-center max-w-3xl mx-auto">
+                                    Real mainnet examples of multi-step pipelines and atomic transactions
+                                </p>
+                            </div>
+                        </section>
                     </div>
-                </section>
 
-                {pipelineExamples.map(example => (
-                    <PipelineExampleCard key={example.id} example={example} />
-                ))}
-            </main>
-        </div>
+                    <div className="min-h-0 flex-1 overflow-y-auto">
+                        {pipelineExamples.map(example => (
+                            <PipelineExampleCard key={example.id} example={example} />
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </section>
     );
 }

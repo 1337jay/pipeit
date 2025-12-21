@@ -12,11 +12,10 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { useState } from 'react';
 import { motion } from 'motion/react';
 import { WalletModal } from './wallet-modal';
-import { Wallet, LogOut, ChevronDown, AlertCircle, Network, Check } from 'lucide-react';
+import { Wallet, LogOut, ChevronDown, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { SolanaClusterId, SolanaCluster } from '@solana/connector';
 
@@ -31,13 +30,6 @@ const clusterLabels: Record<string, string> = {
     'solana:localnet': 'Localnet',
 };
 
-const clusterColors: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-    'solana:mainnet': 'default',
-    'solana:devnet': 'secondary',
-    'solana:testnet': 'outline',
-    'solana:localnet': 'destructive',
-};
-
 export function ConnectButton({ className }: ConnectButtonProps) {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -45,7 +37,6 @@ export function ConnectButton({ className }: ConnectButtonProps) {
     const { connected, connecting, selectedWallet, selectedAccount, disconnect, wallets, cluster } = connector;
     const { clusters, setCluster } = useCluster();
 
-    const clusterName = cluster?.label || 'Unknown';
     const isMainnet = cluster?.id === 'solana:mainnet';
 
     const handleClusterChange = async (clusterId: SolanaClusterId) => {
@@ -101,47 +92,43 @@ export function ConnectButton({ className }: ConnectButtonProps) {
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <div className="px-2 py-1.5">
-                        <div className="flex items-start gap-2">
-                            <AlertCircle className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
-                            <p className="text-xs text-muted-foreground leading-relaxed">
-                                These examples execute SOL transfers (self-transfers to your own address). Each
-                                transaction pays standard network fees.
-                            </p>
-                        </div>
+                        <p className="text-[11px] font-berkeley-mono text-sand-700 leading-relaxed">
+                            Examples execute self-transfers. Network fees apply.
+                        </p>
                     </div>
                     <DropdownMenuSeparator />
-                    <DropdownMenuLabel className="flex items-center gap-2">
-                        <Network className="h-3.5 w-3.5" />
-                        <span className="text-xs">Network</span>
+                    <DropdownMenuLabel className="text-[11px] font-berkeley-mono text-sand-800 uppercase tracking-wide">
+                        Network
                     </DropdownMenuLabel>
-                    {clusters.map((c: SolanaCluster) => {
-                        const isSelected = c.id === cluster?.id;
-                        const label = clusterLabels[c.id] || c.label || c.id;
-                        const color = clusterColors[c.id] || 'outline';
+                    <div className="px-1 pb-1">
+                        <div className="flex flex-wrap gap-1">
+                            {clusters.map((c: SolanaCluster) => {
+                                const isSelected = c.id === cluster?.id;
+                                const label = clusterLabels[c.id] || c.label || c.id;
 
-                        return (
-                            <DropdownMenuItem
-                                key={c.id}
-                                onClick={() => handleClusterChange(c.id as SolanaClusterId)}
-                                className={cn('cursor-pointer', isSelected && 'bg-accent')}
-                            >
-                                <div className="flex items-center justify-between w-full">
-                                    <Badge variant={color} className="text-xs">
+                                return (
+                                    <button
+                                        key={c.id}
+                                        onClick={() => handleClusterChange(c.id as SolanaClusterId)}
+                                        className={cn(
+                                            'inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-berkeley-mono transition-colors',
+                                            isSelected
+                                                ? 'border-sand-1500 bg-sand-1500 text-sand-100'
+                                                : 'border-sand-200 bg-sand-100 text-sand-900 hover:border-sand-300 hover:bg-sand-200',
+                                        )}
+                                    >
                                         {label}
-                                    </Badge>
-                                    {isSelected && <Check className="ml-2 h-3 w-3 flex-shrink-0" />}
-                                </div>
-                            </DropdownMenuItem>
-                        );
-                    })}
+                                        {isSelected && <Check className="h-3 w-3" />}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
                     {!isMainnet && (
                         <div className="px-2 py-1.5">
-                            <div className="flex items-start gap-2 p-2 bg-amber-50 dark:bg-amber-950 rounded-md">
-                                <AlertCircle className="h-3.5 w-3.5 text-amber-600 mt-0.5 flex-shrink-0" />
-                                <p className="text-xs text-amber-700 dark:text-amber-400 leading-relaxed">
-                                    <strong>Note:</strong> Raydium pools only exist on mainnet.
-                                </p>
-                            </div>
+                            <p className="text-[11px] font-berkeley-mono text-sand-700 leading-relaxed">
+                                <span className="text-amber-600">Note:</span> Some examples only work on mainnet.
+                            </p>
                         </div>
                     )}
                     <DropdownMenuSeparator />
