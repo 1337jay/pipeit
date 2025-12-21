@@ -124,13 +124,11 @@ function PipelineExampleCard({ example }: { example: PipelineExampleConfig }) {
 
         // Subscribe to TPU start events
         const unsubStart = tpuEvents.onStart(() => {
-            console.log('🚀 TPU submission starting...');
             setTpuSending(true);
         });
 
         // Subscribe to TPU results
         const unsubResult = tpuEvents.onResult(result => {
-            console.log('📡 TPU Result received:', result);
             setTpuResult(result);
             setTpuSending(false);
         });
@@ -142,10 +140,6 @@ function PipelineExampleCard({ example }: { example: PipelineExampleConfig }) {
         };
     }, [isTpuExample]);
 
-    // Log pipeline state changes for debugging
-    useEffect(() => {
-        console.log('🔄 [Pipeline State]:', visualPipeline.state, '| Has TPU result:', !!tpuResult, '| tpuSending:', tpuSending);
-    }, [visualPipeline.state, tpuResult, tpuSending]);
 
     return (
         <section className="py-16 border-b border-sand-200 last:border-b-0">

@@ -67,8 +67,6 @@ export function ModernSolTransfer() {
             amount: amountInLamports,
         });
 
-        console.log('🚀 Kit SOL Transfer: Starting transaction');
-
         try {
             // Build transaction message using Kit's pipe pattern
             const transactionMessage = pipe(
@@ -86,9 +84,7 @@ export function ModernSolTransfer() {
                 commitment: 'confirmed',
             });
 
-            console.log('✅ Kit SOL Transfer: Transaction confirmed', { signature: transactionSignature });
             setSignature(transactionSignature);
-            console.log('🎉 Kit SOL Transfer: Transaction complete!', { signature: transactionSignature });
 
             // Track transaction in debugger
             if (client) {
@@ -100,7 +96,6 @@ export function ModernSolTransfer() {
                 });
             }
         } catch (error) {
-            console.error('❌ Kit SOL Transfer: Transaction failed', error);
             throw new Error(`Failed to send transaction: ${error instanceof Error ? error.message : String(error)}`);
         }
     }

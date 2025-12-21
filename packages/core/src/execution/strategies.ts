@@ -529,17 +529,12 @@ async function submitToTpu(
     tpuConfig: ResolvedExecutionConfig['tpu'],
     abortSignal?: AbortSignal,
 ): Promise<TpuSubmissionResult> {
-    console.log('🚀 [TPU] submitToTpu called, isBrowser:', isBrowser());
-
     if (isBrowser()) {
-        console.log('🌐 [TPU] Running in browser, dispatching start event');
         // Emit start event
         if (typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('pipeit:tpu:start'));
-            console.log('✅ [TPU] Dispatched pipeit:tpu:start event');
         }
 
-        console.log('📡 [TPU] Calling API route:', tpuConfig.apiRoute);
         // Browser: route through API with config
         const response = await fetch(tpuConfig.apiRoute, {
             method: 'POST',
@@ -564,20 +559,13 @@ async function submitToTpu(
         }
 
         const result: TpuSubmissionResult = await response.json();
-        console.log('📦 [TPU] API result:', result);
 
         // Emit result event for UI components to listen to
         if (typeof window !== 'undefined') {
-            console.log('🎯 [TPU] Dispatching pipeit:tpu:result event');
             window.dispatchEvent(
                 new CustomEvent('pipeit:tpu:result', {
                     detail: result,
                 }),
-            );
-            console.log(
-                '✅ [TPU] Dispatched pipeit:tpu:result event:',
-                result.confirmed ? 'CONFIRMED' : 'NOT CONFIRMED',
-                `(${result.rounds} rounds, ${result.totalLeadersSent} leaders)`
             );
         }
 

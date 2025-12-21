@@ -52,8 +52,6 @@ function PipelineHeaderButtonComponent({
                 throw new Error('No RPC endpoint configured');
             }
 
-            console.log('[Pipeline] Using RPC URL:', rpcUrl);
-
             const rpc = createSolanaRpc(rpcUrl);
             const rpcSubscriptions = createSolanaRpcSubscriptions(rpcUrl.replace('http', 'ws'));
 

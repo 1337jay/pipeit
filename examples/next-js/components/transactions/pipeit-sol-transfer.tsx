@@ -48,8 +48,6 @@ export function PipeitSolTransfer() {
             amount: amountInLamports,
         });
 
-        console.log('🚀 Pipeit SOL Transfer: Starting transaction');
-
         try {
             // Pipeit's fluent API handles everything: blockhash fetching, building, signing, and confirmation
             const transactionSignature = await new TransactionBuilder({
@@ -65,7 +63,6 @@ export function PipeitSolTransfer() {
                 });
 
             setSignature(transactionSignature);
-            console.log('🎉 Pipeit SOL Transfer: Transaction complete!', { signature: transactionSignature });
 
             // Track transaction in debugger
             if (client) {
@@ -77,7 +74,6 @@ export function PipeitSolTransfer() {
                 });
             }
         } catch (error) {
-            console.error('❌ Pipeit SOL Transfer: Transaction failed', error);
             throw new Error(`Failed to send transaction: ${error instanceof Error ? error.message : String(error)}`);
         }
     }

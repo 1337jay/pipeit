@@ -57,7 +57,6 @@ class TpuEventEmitter {
 
         // Handle TPU start event
         this.boundHandleStart = () => {
-            console.log('🔵 [TPU Events] TPU submission starting');
             this.emitStart();
         };
 
@@ -65,7 +64,6 @@ class TpuEventEmitter {
         this.boundHandleResult = (e: Event) => {
             const customEvent = e as CustomEvent;
             const data = customEvent.detail;
-            console.log('🟢 [TPU Events] TPU result received:', data);
 
             if (data && (typeof data.confirmed !== 'undefined' || typeof data.delivered !== 'undefined')) {
                 const result: TpuSubmissionResult = {
@@ -90,15 +88,12 @@ class TpuEventEmitter {
                     })),
                     retryCount: data.retryCount || 0,
                 };
-                console.log('🟣 [TPU Events] Emitting to UI:', result);
                 this.emit(result);
             }
         };
 
         window.addEventListener('pipeit:tpu:start', this.boundHandleStart);
         window.addEventListener('pipeit:tpu:result', this.boundHandleResult);
-
-        console.log('✅ [TPU Events] Now listening for pipeit:tpu:* events');
     }
 
     /**

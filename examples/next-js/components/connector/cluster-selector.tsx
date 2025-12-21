@@ -42,8 +42,8 @@ export function ClusterSelector({ className }: ClusterSelectorProps) {
     const handleClusterChange = async (clusterId: SolanaClusterId) => {
         try {
             await setCluster(clusterId);
-        } catch (error) {
-            console.error('❌ ClusterSelector: Cluster change failed:', error);
+        } catch {
+            // Cluster change failed - silently ignore
         }
     };
 

@@ -224,13 +224,11 @@ async function waitForValidators(
         try {
             const stats = await client.getStats();
             if (stats.knownValidators !== lastValidatorCount) {
-                console.log(`[TPU] Validators discovered: ${stats.knownValidators} (need ${minValidators}+)`);
                 lastValidatorCount = stats.knownValidators;
             }
             
             // Need enough validators for good landing rate
             if (stats.knownValidators >= minValidators && stats.readyState === 'ready') {
-                console.log(`[TPU] ✅ Ready with ${stats.knownValidators} known validators`);
                 return true;
             }
         } catch {
@@ -239,10 +237,6 @@ async function waitForValidators(
         await new Promise(resolve => setTimeout(resolve, pollInterval));
     }
 
-    console.warn(
-        `[TPU] ⚠️ Timeout waiting for validators. Only ${lastValidatorCount} known (wanted ${minValidators}+). ` +
-        `This may reduce landing rate.`
-    );
     return false;
 }
 
@@ -350,49 +344,13 @@ export async function tpuHandler(
         // This prevents "No leaders available" errors on first requests
         // We need at least fanout * 2 validators for good leader discovery
         const minValidators = config.fanout * 2;
-        const hasValidators = await waitForValidators(client, minValidators, 10000);
-        if (!hasValidators) {
-            console.warn(`[TPU] ⚠️ Proceeding with limited validators - landing rate may be reduced`);
-        }
+        await waitForValidators(client, minValidators, 10000);
 
         // Convert base64 transaction to Buffer
         const txBuffer = Buffer.from(body.transaction, 'base64');
 
-        // Get stats for logging
-        let stats: { knownValidators: number; currentSlot: number } | null = null;
-        try {
-            stats = await client.getStats();
-        } catch {
-            // Stats not available
-        }
-
-        console.log('\n┌─────────────────────────────────────────────────────────────┐');
-        console.log('│ 🚀 TPU CONTINUOUS SUBMISSION (until confirmed)              │');
-        console.log('├─────────────────────────────────────────────────────────────┤');
-        console.log(`│ Protocol: QUIC (native)                                     │`);
-        console.log(`│ Mode: Send until confirmed                                   │`);
-        console.log(`│ Transaction size: ${txBuffer.length} bytes`.padEnd(62) + '│');
-        console.log(`│ Configured fanout: ${config.fanout}`.padEnd(62) + '│');
-        console.log(`│ Timeout: 30 seconds                                         │`);
-        if (stats) {
-            console.log(`│ Known validators: ${stats.knownValidators}`.padEnd(62) + '│');
-            console.log(`│ Current slot: ${stats.currentSlot}`.padEnd(62) + '│');
-        }
-        console.log('└─────────────────────────────────────────────────────────────┘\n');
-
         // Send transaction continuously until confirmed (30 second timeout)
         const result = await client.sendUntilConfirmed(txBuffer, 30000);
-
-        console.log('\n┌─────────────────────────────────────────────────────────────┐');
-        console.log(`│ Result: ${result.confirmed ? '✅ CONFIRMED ON-CHAIN' : '❌ NOT CONFIRMED'}`.padEnd(61) + '│');
-        console.log(`│ Signature: ${result.signature.slice(0, 20)}...`.padEnd(62) + '│');
-        console.log(`│ Rounds: ${result.rounds}`.padEnd(62) + '│');
-        console.log(`│ Total leaders sent: ${result.totalLeadersSent}`.padEnd(62) + '│');
-        console.log(`│ Latency: ${result.latencyMs}ms`.padEnd(62) + '│');
-        if (result.error) {
-            console.log(`│ Error: ${result.error.slice(0, 50)}`.padEnd(62) + '│');
-        }
-        console.log('└─────────────────────────────────────────────────────────────┘\n');
 
         // Build response with backwards compatibility
         const response: TpuHandlerResponse = {
@@ -412,8 +370,6 @@ export async function tpuHandler(
 
         return Response.json(response);
     } catch (error) {
-        console.error('TPU handler error:', error);
-
         return Response.json(
             {
                 confirmed: false,
