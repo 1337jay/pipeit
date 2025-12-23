@@ -229,6 +229,7 @@ impl TpuClient {
 
     /// Sends a serialized transaction to TPU endpoints (single attempt).
     ///
+    /// Uses slot-aware leader selection when available, falling back to fanout.
     /// Returns detailed per-leader results including retry statistics.
     /// For higher landing rates, use `send_until_confirmed` instead.
     #[napi]
@@ -237,11 +238,18 @@ impl TpuClient {
         let cm = self.connection_manager.clone();
         let fanout = self.fanout;
 
-        let result = cm
-            .send_transaction_with_fanout(tx_data, fanout)
-            .await
-            .context("Failed to send transaction")
-            .map_err(anyhow_to_napi)?;
+        let (leaders, _slot_position) = self.leader_tracker.get_slot_aware_leaders().await;
+        let result = if leaders.is_empty() {
+            cm.send_transaction_with_fanout(tx_data, fanout)
+                .await
+                .context("Failed to send transaction")
+                .map_err(anyhow_to_napi)?
+        } else {
+            cm.send_to_leaders(tx_data, &leaders)
+                .await
+                .context("Failed to send transaction")
+                .map_err(anyhow_to_napi)?
+        };
 
         // Convert internal LeaderDeliveryResult to NAPI LeaderSendResult
         let leaders: Vec<LeaderSendResult> = result
@@ -526,4 +534,3 @@ impl Drop for TpuClient {
         self.shutdown();
     }
 }
-
