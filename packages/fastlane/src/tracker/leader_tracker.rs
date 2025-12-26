@@ -416,18 +416,34 @@ impl LeaderTracker {
             .await
             .context("Failed to subscribe to gRPC slot updates")?;
 
-            let mut ready_set = false;
-            while let Some(result) = stream.next().await {
-                let update = result.context("gRPC slot stream error")?;
-                if let Some(UpdateOneof::Slot(slot_update)) = update.update_oneof {
-                    let slot = slot_update.slot;
+        let mut ready_set = false;
+        while let Some(result) = stream.next().await {
+            let update = result.context("gRPC slot stream error")?;
+            if let Some(UpdateOneof::Slot(slot_update)) = update.update_oneof {
+                let slot = slot_update.slot;
+
+                // Record the slot update (monotonic source; bypass outlier filtering)
+                let curr_slot = {
                     let mut tracker = self.slots_tracker.write().await;
-                    tracker.record_monotonic(slot);
-                    if !ready_set {
-                        let mut ready = self.ready.write().await;
-                        *ready = true;
-                        ready_set = true;
-                    }
+                    tracker.record_monotonic(slot)
+                };
+
+                // Mark as ready once we start receiving updates
+                if !ready_set {
+                    let mut ready = self.ready.write().await;
+                    *ready = true;
+                    ready_set = true;
+                }
+
+                // Check if we need to rotate to next epoch (keep schedule fresh across epoch boundaries)
+                let needs_rotation = {
+                    let schedule_tracker = self.schedule_tracker.read().await;
+                    curr_slot >= schedule_tracker.next_epoch_slot_start()
+                };
+
+                if needs_rotation {
+                    self.rotate_epoch(curr_slot).await?;
+                }
             }
         }
 
